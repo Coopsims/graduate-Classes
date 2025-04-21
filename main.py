@@ -14,3 +14,6 @@ if __name__ == '__main__':
     print_hi('world')
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
+# iterable vs iterator
+# look at next
