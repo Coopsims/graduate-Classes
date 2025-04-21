@@ -1,0 +1,232 @@
+---
+title: "Problem Set 3"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(HistData)
+```
+
+## Introduction
+
+These questions were rendered in R markdown through RStudio (<https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf>, <http://rmarkdown.rstudio.com> ).
+
+Please generate your solutions in R markdown and upload both a knitted doc, docx, or pdf document in addition to the Rmd file.
+
+The questions in this problem set use material from the slides on discrete probability spaces and the Rmd "Discrete_Probability_Distributions_2_3_3.Rmd".
+
+### Collaboration
+
+(5 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself: None
+
+### AI
+
+(5 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools: GPT o3
+
+## Introduction
+
+In this problem set, we will look at another approach to the hypothesis testing situation from problem set 2. To do this, we will use the idea of *conditional probability*. In general, given a probability space $(S,M,P)$ and an event $C$, we can define a related probability space $(S_C,M_C,P_C)$ by taking $S_C=S$,$M_C=M$. To define $P_C$, for any $A\in M_C$ set $P_C(A)= P(A\cap C)/P(C)$. This is also called the conditional probability of $A$ occurring given that $C$ has occurred, and is written $P(A|C)$.
+
+The study
+
+Kannan S, Bruch JD, Song Z. Changes in Hospital Adverse Events and Patient Outcomes Associated With Private Equity Acquisition. JAMA. 2023;330(24):2365--2375. <doi:10.1001/jama.2023.23147>
+
+found that the rate of hospital-acquired conditions (HAC) at private equity hospitals increased from 18.1 per 10,000 eligible hospitalizations before acquisition to 22.1 per 10,000 eligible hospitalizations after acquisition.
+
+This problem set, as did problem set 2, will use those rates to illustrate an application of binomial probability spaces in a much simpler setting than addressed in the study.
+
+### Frame Question
+
+For the purposes of the questions on this problem set, we assume outcomes of eligible hospitalizations are independent and the rate of hospital-acquired conditions has some value $p$ that does not depend on whether the observation was made before or after private equity-acquisition. The binary outcome of whether a hospital-acquired condition occurred is noted for each eligible hospitalization.
+
+Suppose that there were $n_b=3,000$ eligible hospitalizations before acquisition and $n_a=2,000$ eligible hospitalizations after acquisition.(These numbers are reduced from problem set 2 to speed and simplify the numeric estimates.)
+
+Explicitly, the null model $(S,M,P)$ is defined by setting $S=\left\{(a,b): a\in \{ 0,...2000\} \wedge b\in \{ 0,...3000\}\right\}$, the density $f((a,b))=dbinom(a,2000,p)dbinom(b,3000,p)$, using R notation, and $M$ is the power set of $S$. This represents the experiment of sampling $Binomial(2000,p)$ to get $a$ and $Binomial(3000,p)$ to get $b$ and recording $(a,b)$ as an outcome. Note that the probability that the total number of HACs, $a+b$, equals some $c$ is given by the binomial distribution with size $5000$ and probability $p$ because it is the number of occurrences of HACs in $5000$ independent trials in which the probability of an occurrence is $p$.
+
+### Question 1, part 1
+
+(5 points)
+
+To begin to define a hypothesis test directly from this model, let $A$ be the event $\{(x,y)\in S:x=a\}$ and let $C$ be the event $\{(x,y)\in S:x+y=c\}$. Please calculate the probability of $A$ given $C$ using this null model. Please include the derivation.
+
+Please give your answer in terms of $a$, $c$, $n_a$, and $n_b$. You will note that $p$ does not appear in the formula.
+
+#### your answer here
+
+Conditional probability is given as: $P(A \mid C) = \frac{P(A \cap C)}{P(C)}.$
+
+This means from the null model, the outcome of a given c and a occurs can be found through: $$P(A \cap C) = \binom{n_a}{a} p^a (1-p)^{n_a - a} \cdot \binom{n_b}{c-a} p^{c-a} (1-p)^{n_b - (c-a)}= \binom{n_a}{a}\binom{n_b}{c-a} p^c (1-p)^{n_a+n_b-c}.$$
+
+Because c successes occur we also know $$P(C) = \binom{n_a+n_b}{c} p^c (1-p)^{n_a+n_b-c}.$$
+
+meaning that all of this simplifies down to the formula: $$P(A \mid C) = \frac{\binom{n_a}{a}\binom{n_b}{c-a}}{\binom{n_a+n_b}{c}}.$$
+
+### Q1, part 2
+
+(10 points)
+
+Consider the two functions below intended to calculate approximate numerical values for probability of $A$ given $C$ under the null model.
+
+```{r}
+
+n.after<-2000 # number of eligible hospitalizations in after acquisition
+n.before<-3000 # number of eligible hospitalizations in before acquisition
+tot<-9
+
+
+prob.a.given.c<-function(a,c,n.a,n.b){
+  b<-c-a
+  return(exp(log(choose(n.a,a))+log(choose(n.b,b))-log(choose(n.a+n.b,c))))
+  
+}
+
+prob.a.given.c.est<-function(a,c,n.a,n.b){
+  return(dbinom(a,c,prob=n.a/(n.a+n.b)))
+  
+}
+
+a_values <- 0:tot
+direct_results <- sapply(a_values, function(a) prob.a.given.c(a, tot, n.after, n.before))
+est_results    <- sapply(a_values, function(a) prob.a.given.c.est(a, tot, n.after, n.before))
+
+comparison_df <- data.frame(a = a_values,
+                            Direct = direct_results,
+                            Estimation = est_results)
+print(comparison_df)
+
+are_identical <- all.equal(direct_results, est_results)
+are_identical
+```
+
+Do the functions give the same results for all values of $a$, $c$, $n_a$, and $n_b$? If so, why? If not, please give values of $a$, $c$, $n_a$, and $n_b$ for which the functions give different results.
+
+#### your answer here
+
+They are close but there is still some variation in each of the answers., but for each value of a they are extremely similar, and an average difference of
+
+```         
+0.00085
+```
+
+## Question 1, part 3
+
+(10 points)
+
+We will continue the construction of a hypothesis test defined by the null model above using the function `prob.a.given.c` to give a numerical value for the probability of $A$ given $C$ under the null model.
+
+For an outcome $(a,b)$, we will reject the null hypothesis at the 0.05 level, say, if the probability of $\{(x,c-x):x\leq a\}$, given $C=\{(x,y)\in S:x+y=c\}$, is less than or equal to 0.025. We will also reject the null at the 0.05 level if the probability of $\{(x,c-x):x\geq a\}$ given $C$ is less than or equal to 0.025.
+
+```{r}
+n.a<-n.after
+n.b<-n.before
+c<-10
+# Function to calculate the probability of A given C for a in 0 through the value of c defining the event C
+p.true.c<-function(c,n.a,n.b){
+  return(prob.a.given.c(0:c,c,n.a,n.b))
+}
+
+```
+
+The function `p.reject` calculates the probability of an outcome $(a,b)$ given $c$ that would lead to rejection of the null hypothesis at the 0.05 level. The variable `p.reject.vec` applies this function to the values of $c$ from 1 to 150.
+
+```{r}
+
+p.reject<-function(c,n.a,n.b){
+  q<-n.a/(n.a+n.b)
+  # calculate the probability of a given c for a in 0 through c
+  p.true<-p.true.c(c,n.a,n.b)
+  # calculate the cumulative sum of the probabilities
+  p.true.cum<-cumsum(p.true)
+  # Find the largest a for which the of a value of a or less given c is less than .025
+  if(p.true[1]<.025){
+    lower.tail<-max(which(p.true.cum<.025)) # the largest index of the cumulative sum with value less than .025
+    lower.sum<-sum(p.true[1:lower.tail]) # the sum of the probabilities of a value of a or less
+  } else {
+    lower.sum<-0
+  }
+  p.true.rev<-rev(p.true) # reverse the order of the probabilities
+  p.true.rev.cum<-cumsum(p.true.rev)
+  if(p.true.rev[1]<.025){
+    upper.tail<-max(which(p.true.rev.cum<.025))
+    upper.sum<-sum(p.true.rev[1:upper.tail])
+  } else {
+    upper.sum<-0
+  }
+  
+  return(lower.sum+upper.sum)
+}
+
+p.reject(75,n.after,n.before)
+
+p.reject.vec<-sapply(1:150,p.reject,n.a=n.after,n.b=n.before)
+p.reject.vec[10]
+
+```
+
+What is the type 1 error rate of this test given c=10?
+
+#### your answer here
+
+it is
+
+```         
+0.01823281
+```
+
+### Question 1, part 4
+
+(10 points)
+
+The vector `c.vec` contains the probabilities of $c=1$ through $c=150$ given the null model and $p=0.00201$.
+
+```{r}
+HAC.rate<-(18.1/10000+22.1/10000)/2
+c.vec<-dbinom(1:150,n.a+n.b,HAC.rate)
+
+(c.vec*p.reject.vec)[1:15]
+```
+
+With this value of $p$, what is the probability of rejecting the event that both $c=10$ and the null hypothesis is rejected at the 0.05 level? That is, what is the probability of the event $\{(a,b):a+b=10 \text{ and } a \text{ results in rejection of the null at the 0.05 level} \}$?
+
+#### your answer here
+
+```{r}
+(c.vec * p.reject.vec)[10]
+```
+
+### Question 1, part 5
+
+(5 points)
+
+Note that the probability of the event $D=\{(x,y):x+y>150\}$ extremely small.
+
+```{r}
+pbinom(150,n.a+n.b,prob=HAC.rate,lower.tail=FALSE)
+
+```
+
+Please give a numerical estimate for the probability of a type 1 error under the null model using this method and this value of $p$ based on the calculations above.
+
+#### your answer here
+
+```{r}
+type1_error_partial <- sum(c.vec * p.reject.vec)
+
+tail_prob <- pbinom(150, n.a + n.b, HAC.rate, lower.tail=FALSE)
+
+type1_error_est <- type1_error_partial + tail_prob
+
+type1_error_est
+```

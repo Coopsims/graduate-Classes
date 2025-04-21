@@ -1,0 +1,331 @@
+---
+title: "Spotify Final Project"
+author: "Ben Funk"
+output: 
+  word_document: default
+---
+
+# Research Question:
+
+Is it possible to identify song attributes which correlate with higher popularity. My main new analysis will involve a random forest model to predict song popularity using multiple song attributes attributes.
+
+I will analyze a dataset containing 114,000 songs, providing a larger sample for analysis. Each record contains features Like:
+
+• Danceability
+
+• Energy
+
+• Speechiness
+
+• Acousticness
+
+• Instrumentalness
+
+• Liveness
+
+• Valence
+
+• Tempo
+
+• Explicit
+
+• Key
+
+and the one I will be predicting:
+
+• Popularity (numeric range, 0--100)
+
+Popularity will be the factor I predict using a subbset of the data provided.
+
+The method I will be using for this analysis is a Random Forest Model(RFM). I believe this is one of the best all around models to use for any supervised training and has the easiest structures to understand. A RFM is made up of a bunch of smaller models called Decision Trees. In each decision tree think of the structure like a bunch of if statements with a bunch of branches stemming from that. This process is then stacked over and over to make up the final tree. Now a RFM takes hundreds of decision trees and uses the output from all trees to make its decision. In addition to that, RFM is able to handle null values extremely well, and also deal with colinearity.
+
+### Imports needed to run the code:
+
+```{r}
+library(caret)         
+library(randomForest)  
+library(ggplot2)       
+library(corrplot)      
+library(lubridate)     
+library(dplyr)    
+library(doParallel)
+library(ranger)
+```
+
+This is the cutoff to determin popularity. It will be arbitrarily set for now but will get updated later into the Rmd.
+
+```{r}
+MINIMUM_POPULARITY_LIMIT <- 50
+```
+
+# EDA
+
+First we import the data.
+
+```{r}
+dataset <- read.csv("dataset.csv")
+```
+
+We want to look at the format of the data and note any general trends.
+
+```{r}
+head(dataset)
+```
+
+Next I want to check for any null values. this allows me to see if there are any columns with a majority of missing data
+
+```{r}
+colSums(is.na(dataset))
+```
+
+That is the best thing to see as a data scientist. This means I don't need to worry about dealing with Null values. Now to check and make sure the values of the columns make sense.
+
+```{r}
+summary(dataset)
+```
+
+Popularity has a median of 35 so that might be a better place to put the division, as that splits the dataset, but that can be looked at later in the model training
+
+After looking through the columns, there are several things to note, for the model I'm training, the columns "track_id", "artists", "album_name", "track_name" are of no use. They could technically be used if the values were encoded, however that is outside the scope of the project. The row which I will encode will be the track genre column. This column is directly related to song popularity and as such will be included.
+
+```{r}
+dataset$track_genre_encoded <- as.numeric(factor(dataset$track_genre))
+dataset <- dataset %>% select(-c(X,track_id, artists, album_name, track_name, track_genre))
+```
+
+The Correlation is calculated by looking at the covariance/ std of the two params.
+
+```{r}
+dev.new(width = 8, height = 8)
+numeric_vars <- dataset %>% select_if(is.numeric)
+corr_matrix <- cor(numeric_vars, use = "complete.obs")
+
+corrplot(corr_matrix, method = "color", tl.cex = 0.8,
+         title = "Correlation Matrix of dataset", mar = c(0, 0, 1, 0))
+
+```
+
+With the Correlation matrix I am not seeing any major relationships between popularity and ant of the other columns. There might be some Co-linearity between energy and acousticness, But luckily A random forest model is capable of handling that case internally.
+
+# Model Training
+
+Since all of the data looks to be clean, I will select the features I want to train, select a popularity threshold to train the final model on, and perform a train-test split on the data. A train-test split is done in basically all supervised models and is a great method to check and ensure the trained model is not over trained on the data.
+
+```{r}
+# Define feature columns used for modeling
+features <- c("track_genre_encoded", "danceability", "energy", "key", "loudness",
+              "mode", "speechiness", "acousticness", "instrumentalness", "liveness",
+              "valence", "tempo", "time_signature", "explicit")
+set.seed(42)
+trainIndex <- createDataPartition(dataset$popularity, p = 0.8, list = FALSE)
+trainData <- dataset[trainIndex, ]
+testData  <- dataset[-trainIndex, ]
+
+train_control <- trainControl(method = "cv", number = 3, allowParallel = TRUE)
+```
+
+Next I am going to look through different thresholds for popularity cutoff. Since there is no obvious decision this part will go through and train a basic model on each of the different cutoffs. From there I will decide on an ideal cutoff which makes sense relative to the dataset.
+
+I am using an F1 score as that is the best metric to prevent over fitting. The equation is shown in the coding block below.
+
+```{r}
+# starting the training cluster
+cores <- parallel::detectCores() - 1  
+cl <- makeCluster(cores)
+registerDoParallel(cl)
+```
+
+```{r}
+# NOTE: This takes ~ 16 minutes
+start_time <- Sys.time()
+
+# Define the range of popularity thresholds to test
+thresholds <- seq(31, 85, by = 2)
+
+results <- foreach(thr = thresholds, .combine = rbind,
+                   .packages = c("caret", "ranger", "e1071"),
+                   .export = c("trainData", "testData", "features", "train_control")) %dopar% {
+  
+  # (Optional) Remove printing to avoid console clutter:
+  # print(thr)
+  
+  # Create binary popularity variable based on the current threshold
+  trainData$popularity_binary <- ifelse(trainData$popularity > thr, 1, 0)
+  testData$popularity_binary  <- ifelse(testData$popularity > thr, 1, 0)
+  
+  # Convert to factor for classification
+  trainData$popularity_class <- as.factor(trainData$popularity_binary)
+  testData$popularity_class  <- as.factor(testData$popularity_binary)
+  
+  # Train the Random Forest model using caret with the current threshold
+  set.seed(42)
+  rf_model <- train(popularity_class ~ .,
+                    data = trainData[, c(features, "popularity_class")],
+                    method = "ranger",
+                    tuneLength = 1,
+                    trControl = train_control)
+  
+  # Predict on the test set
+  predictions <- predict(rf_model, newdata = testData[, features])
+  
+  # Compute the confusion matrix
+  cm <- confusionMatrix(predictions, testData$popularity_class, positive = "1")
+  
+  # Extract precision and recall (Pos Pred Value and Sensitivity)
+  precision <- cm$byClass["Pos Pred Value"]
+  recall    <- cm$byClass["Sensitivity"]
+  
+  # Compute F1 score
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  # Return the threshold and its corresponding F1 score as a data frame
+  data.frame(Threshold = thr, F1 = f1)
+}
+
+end_time <- Sys.time()
+elapsed_time <- end_time - start_time
+cat("Elapsed time:", elapsed_time, "\n")
+
+# Identify the threshold with the highest F1 score
+best_threshold <- results$Threshold[which.max(results$F1)]
+cat("Best threshold based on test set F1 is:", best_threshold, "\n")
+
+# Optional: View the full results
+print(results)
+```
+
+```{r}
+plot(results$Threshold, results$F1, type="b", xlab="Threshold", ylab="F1 Score", main="Threshold vs F1 Score")
+```
+
+This test was good to see, a general pattern that 30-40 has a high f1 score, with it decreasing as the popularity threshold increases. For the absolute best result a popularity cutoff if 30 is very enticing, but I think 35 makes the most sense. I picked 35 as that is the median popularity giving a good split, But arguments for 40, 50 or even 80 could be made.
+
+Ultimately, this is the art of data science, and the split point can be set to any cut off given a good enough explanation and justification.
+
+```{r}
+MINIMUM_POPULARITY_LIMIT <- 35
+set.seed(42)
+trainIndex <- createDataPartition(dataset$popularity, p = 0.8, list = FALSE)
+trainData <- dataset[trainIndex, ]
+testData  <- dataset[-trainIndex, ]
+
+# Create binary target based on MINIMUM_POPULARITY_LIMIT
+trainData$popularity_binary <- ifelse(trainData$popularity > MINIMUM_POPULARITY_LIMIT, 1, 0)
+testData$popularity_binary  <- ifelse(testData$popularity > MINIMUM_POPULARITY_LIMIT, 1, 0)
+trainData$popularity_class <- as.factor(trainData$popularity_binary)
+testData$popularity_class  <- as.factor(testData$popularity_binary)
+
+train_control <- trainControl(method = "cv", number = 3, allowParallel = TRUE)
+```
+
+Now that the bins have been updated we can retrain the model, report final results and save the trained model for future use if needed.
+
+```{r}
+# NOTE: takes 4.5 minutes to run
+
+# Start timer and set seed
+start_time <- Sys.time()
+set.seed(42)
+
+# Train the random forest model using the "ranger" method
+rf_model <- train(popularity_class ~ .,
+                  data = trainData[, c(features, "popularity_class")],
+                  method = "ranger",
+                  tuneLength = 5,
+                  trControl = train_control)
+
+# Generate predictions on the test data
+predictions <- predict(rf_model, newdata = testData[, features])
+
+# Compute the confusion matrix
+cm <- confusionMatrix(predictions, testData$popularity_class, positive = "1")
+
+precision <- cm$byClass["Pos Pred Value"]
+recall    <- cm$byClass["Sensitivity"]
+
+# Compute F1 score
+f1 <- 2 * (precision * recall) / (precision + recall)
+
+print(precision)
+print(recall)
+print(f1)
+# Stop timer and calculate elapsed time
+end_time <- Sys.time()
+elapsed_time <- end_time - start_time
+cat("Elapsed time:", elapsed_time, "\n")
+print(cm)
+```
+
+
+```{r}
+print(precision)
+print(recall)
+print(f1)
+```
+
+After seeing these values the model has been trained extremely well from the hyperparameter tuning.
+I am now going to retrain the model using the exact same parameters, but this time recording the values from the underlying scoring metric, Gini impurity. This will allow us to see what attributes contribute most to the models performance. The Gini Impurity is how the model decides where to split the data. It is essentially trying to maximize the variance loss with each split, given the probabiliy something occurs on each side of that split.(https://en.wikipedia.org/wiki/Decision_tree_learning)
+
+```{r}
+best_mtry          <- rf_model$bestTune$mtry
+best_min_node_size <- rf_model$bestTune$min.node.size
+best_splitrule     <- rf_model$bestTune$splitrule
+
+cat("Best hyperparameters found:\n")
+cat("mtry        =", best_mtry, "\n")
+cat("splitrule   =", best_splitrule, "\n")
+cat("min.node.size =", best_min_node_size, "\n")
+
+
+
+# We use the same trainControl. If you want more folds or parallel, adjust as needed.
+set.seed(42)
+final_ranger_model <- ranger(
+  formula       = popularity_class ~ .,
+  data          = trainData[, c(features, "popularity_class")],
+  mtry          = best_mtry,
+  min.node.size = best_min_node_size,
+  splitrule     = best_splitrule,
+  num.trees     = 500,
+  importance    = "impurity",  # guaranteed to store variable.importance
+  classification = TRUE
+)
+
+```
+
+```{r}
+importance_vals <- final_ranger_model$variable.importance
+
+if (is.null(importance_vals) || length(importance_vals) == 0) {
+  stop("No variable importance found. Check that importance='impurity' was passed.")
+}
+
+# Convert to data frame, then sort descending
+importance_df <- data.frame(
+  Feature    = names(importance_vals),
+  Importance = as.numeric(importance_vals)
+)
+importance_df <- importance_df[order(importance_df$Importance, decreasing = TRUE), ]
+
+print(head(importance_df, 5))
+
+library(ggplot2)
+
+ggplot(importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Features") +
+  ylab("Importance") +
+  ggtitle("Feature Importance (Ranger w/ Best Hyperparameters)")
+```
+
+This graph looks really good. We can see that the genre is by far the most important attribute followed by acousticness. One thing to note is that this graph does not tell us what level of acousticness corresponds to a higher popularity, only that they are related. With this graph, the feature importance tells a defining story for the research. This also is a much better visual than the Correlation matrix. While that matrix looks at the covariance, the random forest was much better at decerning non-linear relationships in the data. Track Genre was the most significant feature for popularity. This makes sense as one genre is typically more popular than the rest. in the 70's-90's Rock was the outstanding genre, as we've shifted into the 21st century, pop and hip-hop have taken over the stage as the most popular genres.
+
+
+To wrap up the coding we must finally end the cluster used for parallel processing. this ensures all connections are severed correctly.
+
+```{r}
+# Stop the parallel cluster to end the script
+stopCluster(cl)
+```
+

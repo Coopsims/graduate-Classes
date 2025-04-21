@@ -1,0 +1,381 @@
+---
+title: "Problem Set 6"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+# run the line below once to install the package. Note that this package is less stable than base R packages. I saw a warning about RTools when I installed it, but it worked anyway.
+ #install.packages("unifed")
+library(knitr)
+library(unifed)
+library(ggplot2)
+```
+
+## Introduction
+
+These questions were rendered in R markdown through RStudio (<https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf>, <http://rmarkdown.rstudio.com> ).
+
+Please generate your solutions in R markdown and upload both a knitted doc, docx, or pdf document in addition to the Rmd file.
+
+### Collaboration
+
+(5 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself: None
+
+### AI
+
+(5 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools: o3 gpt
+
+# Question 1
+
+(5 points)
+
+For the joint density $f(x,y)=x+y$ on $[0,1]\times[0,1]$, is projection onto $x$, $X((x,y))=x$ independent of projection onto $y$, $Y((x,y))=y$?
+
+To address this, please give an example of an event $A$ specified in the form $A=\{(x,y): x\in [a,b]\}$ and an event $B$ specified in the form $B=\{(x,y): y\in [c,d]\}$ such that $P(A\cap B)\neq P(A)P(B)$ or give a general argument that $P(A\cap B)=P(A)P(B)$ for all such $A$ and $B$.
+
+This question does not require any R code, but you may use R if you wish.
+
+### your answer here
+
+$$
+f_{X,Y}(x,y) \;=\; 
+\begin{cases}
+x + y, & 0 \le x \le 1,\; 0 \le y \le 1,\\
+0, & \text{otherwise}.
+\end{cases}
+$$
+
+$$
+f_X(x) 
+\;=\; \int_{0}^{1} \bigl(x + y\bigr)\,dy 
+\;=\; x + \frac{1}{2}, 
+\quad 0 \le x \le 1.
+$$
+
+$$
+f_Y(y) 
+\;=\; \int_{0}^{1} \bigl(x + y\bigr)\,dx 
+\;=\; \frac{1}{2} + y,
+\quad 0 \le y \le 1.
+$$
+
+$$
+\text{If }X\text{ and }Y\text{ were independent, we would need }
+f_{X,Y}(x,y) \;=\; f_X(x)\,f_Y(y),
+$$
+
+$$
+f_{X,Y}(x,y) \;{=}\; x + y 
+ \text{ and } f_X(x)\,f_Y(y) \;{=}\;
+\bigl(x + \tfrac{1}{2}\bigr)\,\bigl(y + \tfrac{1}{2}\bigr)
+\;=\; xy + \tfrac{x + y}{2} + \tfrac{1}{4}
+\text{ therefore theyre aren't independent.}
+$$
+
+# Question 2
+
+Standardizing observed values of variables is a common practice in statistics. The function "scale" from base R below takes a vector of observed values and returns a vector of the standardized values. Given a vector $\mathbf{x}$ of observed values, the standardized values are given by $\frac{x_i-\bar{x}}{s}$ where $\bar{x}$ is the sample mean and $s$ is the sample standard deviation of $\mathbf{x}$.
+
+## Question 2, part 1
+
+(5 points)
+
+What is the mean of $\mathbf{x}-\bar{\mathbf{x}}$? What is the variance of $\mathbf{x}-\bar{\mathbf{x}}$? Please give a mathematical argument for your answer. You may use R to guide or check your answer.
+
+### your answer here
+
+$$
+\text{Given } \bar{x} = \frac{1}{n}\sum_{i=1}^n x_i, 
+\quad s^2 = \frac{1}{n} \sum_{i=1}^n (x_i - \bar{x})^2.
+$$
+
+$$
+\text{Mean}\bigl[x_i - \bar{x}\bigr]
+= \frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})
+= \frac{\sum_{i=1}^n x_i - n\,\bar{x}}{n} 
+= 0.
+$$
+
+$$
+\text{Var}\bigl[x_i - \bar{x}\bigr]
+= \frac{1}{n} \sum_{i=1}^n \bigl[(x_i - \bar{x}) - 0\bigr]^2
+= s^2.
+$$
+
+## Question 2, part 2
+
+(5 points)
+
+What is the variance of $\frac{\mathbf{x}}{s}$ What is the variance of $\frac{\mathbf{x}-\bar{\mathbf{x}}}{s}$ Please give a mathematical argument for your answer. You may use R to guide or check your answer.
+
+### your answer here
+
+$$
+\text{Var}\!\Bigl[\frac{x_i}{s}\Bigr]
+= \frac{1}{s^2}\,\text{Var}[x_i]
+= \frac{s^2}{s^2} 
+= 1 
+$$
+
+$$
+\text{Var}\!\Bigl[\frac{x_i - \bar{x}}{s}\Bigr]
+= \frac{1}{n}\sum_{i=1}^n \Bigl(\frac{x_i - \bar{x}}{s}\Bigr)^2 
+= \frac{1}{s^2} \Bigl(\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^2\Bigr)
+= \frac{s^2}{s^2}
+= 1.
+$$
+
+```{r}
+set.seed(6789)
+x <- rnorm(10)           
+x.scaled <- scale(x)     
+mean_of_residuals <- mean(x - mean(x))
+var_of_residuals  <- mean((x - mean(x))^2)
+mean_of_residuals
+var_of_residuals
+```
+
+# Question 3
+
+## Normal Approximations
+
+Many statistical methods involve approximation of a distribution by a Normal distribution. The parts of this question are intended to build intuition for when this is reasonable for binomial distributions. The questions work toward visually and, optionally, numerically assessing the quality of Normal approximations of several distributions.
+
+## Question 3, part 1
+
+(5 points)
+
+The function "prob.intervals" below takes the "size" and "prob" values for a binomial distribution and the "mean" and "sd" parameters of a Normal distribution. The function computes a vector of the probabilities of the events $\left[s-\frac{1}{2},s+\frac{1}{2}\right]$ under the Normal distribution for each $s$ in the sample space of the binomial distribution, $\{0,1,2...size\}$: $\left[-\frac{1}{2},\frac{1}{2}\right]$, $\left[\frac{1}{2},\frac{3}{2}\right]$,etc.
+
+Please use this to calculate the $\sum_{s=0}^{size}|f(s)-P\left(\left[s-\frac{1}{2},s+\frac{1}{2}\right]\right)|$ where $f$ is the density function for the binomial distribution with "size"=4 and "prob"=0.1 and $P$ is the probability function for the Normal distribution with values of $\mu$ and $\sigma^2$ equal to the expected value and variance of the $Binomial(4,0.1)$ distribution.
+
+```{r}
+prob.intervals<-function(size,prob,mean,sd){
+  x.left<-(0:size)-.5 # the lower bounds of the intervals
+  x.right<-(0:size)+.5 # the upper bounds of the intervals
+  p.left<-pnorm(x.left,mean,sd) # probabilities of [-infty,x.left] under                                   # this Normal distribution
+  p.right<-pnorm(x.right,mean,sd) # probabilities of [-infty,x.right]                                      # under this Normal distribution
+  p.interval<-p.right-p.left # probabilities of [x.left,x.right]
+  return(p.interval)
+}
+```
+
+### your answer here
+
+```{r}
+size <- 4
+prob <- 0.1
+mu   <- size * prob       
+sd   <- sqrt(size * prob * (1 - prob)) 
+
+x    <- 0:size
+f.bin <- dbinom(x, size, prob)
+
+f.norm <- prob.intervals(size, prob, mu, sd)
+
+sum_abs_diff <- sum(abs(f.bin - f.norm))
+sum_abs_diff
+```
+
+## Question 3, part 2
+
+(5 points)
+
+Each row of the matrix "dists" below holds the size and the probability of success for a binomial distribution. The function "params.get" takes a vector of the size and probability of success of a binomial distribution as arguments and returns the a vector with the values of $\mu$ and $\sigma$, the mean and standard deviation of the corresponding binomial distribution.
+
+For each row, please generate a plot of the density function of the corresponding binomial distribution with the plot of the related Normal distribution with the same mean and standard deviation also shown, using the same scales. One way to display output from a loop is to apply the "print" explicitly to any desired output. Alternatively, the print method for a list of ggplot objects will display the plots.
+
+```{r}
+ns<-c(5,20,1000)
+ps<-c(.5,.2,.1)
+dists<-matrix(c(rep(ns,times=rep(length(ps),length(ns))),
+              rep(ps,times=length(ns))),ncol=2)
+
+
+params.get<-function(sz.prob){
+  sz<-sz.prob[1]
+  pr<-sz.prob[2]
+  x<-0:sz
+  f<-dbinom(x,sz,pr)
+  mu<-sz*pr
+  sigma<-sqrt(sz*pr*(1-pr))
+  return(c(mu,sigma))
+}
+```
+
+The function below is a plotting function for one vector of size and probability. This will display the probabilities of the outcomes of binomial distribution (omitting the extreme lower and upper tails) as points and the probabilities of those outcomes according to the Normal approximation as bars.
+
+```{r}
+
+
+dist.plot<-function(sz.prob){
+  mu.sd<-params.get(sz.prob)
+  # Extract the size and probability from the input vector.
+  sz<-sz.prob[1]
+  pr<-sz.prob[2]
+  # Generate a vector of the outcomes of the binomial distribution.
+  x<-0:sz
+  # Compute the probabilities of the outcomes of the binomial distribution.
+  f<-dbinom(x,sz,pr)
+  # Compute the probabilities of the outcomes of the binomial distribution according to the Normal approximation.
+  f.norm<-prob.intervals(sz,pr,mu.sd[1],mu.sd[2])
+  # Create a data frame for the plot.
+  dat.plot<-data.frame(x=x,f=f,f.norm=f.norm)
+  g<-ggplot(dat.plot,aes(x=x))+geom_point(aes(y=f))+
+    geom_col(aes(y=f.norm),fill="orange",alpha=.5)+
+    labs(title=str_c("size=",sz,", probability=",pr))
+  # Drop the extreme tails from the plot.
+  return(g+coord_cartesian(xlim = c(qbinom(.0001,sz,pr), qbinom(.9999,sz,pr))))
+}
+
+# sample plot
+dist.plot(dists[2,])
+```
+
+### your answer here
+
+```{r}
+prob.intervals <- function(size, prob, mean, sd){
+  x.left  <- (0:size) - 0.5
+  x.right <- (0:size) + 0.5
+  p.left  <- pnorm(x.left,  mean, sd)
+  p.right <- pnorm(x.right, mean, sd)
+  p.interval <- p.right - p.left
+  return(p.interval)
+}
+
+plots_list <- list()
+for(i in 1:nrow(dists)){
+  g_i <- dist.plot(dists[i,])
+  plots_list[[i]] <- g_i
+}
+
+# Display each plot in turn:
+for(i in seq_along(plots_list)) {
+  print(plots_list[[i]])
+}
+```
+
+## Question 3, part 3
+
+(5 points)
+
+Based on the plots in Question 3, part 2, how does the value of the probability of success affect the extent to which the sample distributions are approximately Normally distributed? How does the number $size$ of independent Bernoulli trials affect the extent to which the sample distributions are approximately Normally distributed?
+
+### your answer here
+
+Optionally, one can use the method below, to get a numerical measure of how good the approximation is:
+
+```{r}
+dist.calc <- function(sz.prob){
+  mu.sd <- params.get(sz.prob)
+  sz    <- sz.prob[1]
+  pr    <- sz.prob[2]
+  x     <- 0:sz
+  f.bin <- dbinom(x, sz, pr)
+  sum(abs(f.bin - prob.intervals(sz, pr, mu.sd[1], mu.sd[2])))
+}
+
+dist.calc(c(5,0.5)) 
+dist.calc(c(5,0.1))
+dist.calc(c(1000,0.1))
+
+```
+
+as seen from above, being more centered around 0.5 gives a better result, and having a large sample size gives a better result
+
+# Question 4
+
+Consider $n$ mutually independent uniform random variables $X_1,X_2,...,X_n$ on $[0,1]$. Let $Y_n=\sum_{i=1}^nX_i$. In the work below, we will consider the distribution of $Y_n$ as $n$ grows.
+
+In general, the cumulative distribution function $F(t)$ of the sum $X+Y$ of continuous jointly distributed random variables $X$ and $Y$ with joint density $f(x,y)$ equals $\int_{-\infty}^\infty\int_{-\infty}^{t-x}f(x,y)dydx$. This follows because this is the double integral of the joint density over all the points $(x,y)$ for which $x+y\leq t$. Under reasonable assumptions on $f$, the density function of $X+Y$ equals *convolution* $h(t)=\int_{-\infty}^{\infty}f(x,t-x)dy$.
+
+## Question 4, part 1
+
+(5 points)
+
+For $n=2$, what is the density of $Y_2$? What is the expected value of $Y_2$? What is the variance of $Y_2$?
+
+$$
+f_{Y_2}(y) = 
+\begin{cases}
+y,    & 0 \le y \le 1,\\
+2 - y,& 1 < y \le 2,\\
+0,    & \text{otherwise}
+\end{cases}
+$$
+
+$$
+E[Y_2] = 1
+$$
+
+$$
+\mathrm{Var}(Y_2) = \tfrac{1}{6}
+$$
+
+## Question 4, part 2
+
+(5 points)
+
+The function "dirwin.hall" below takes the values of $t$ and $n$ as arguments and returns the density of $Y_n$ at $t$. The function not vectorized in $t$ but we can vectorize it by using the "sapply" function. Please use "stat_function" to plot the density of $Y_n$ and the density of a Normal distribution with the same mean and variance as $Y_n$ for $n=2,3,4,5,10$.
+
+```{r}
+# dirwin.hall(1:2,5) # example of non-standard level of support. The function dirwin.hall isn't vectorized. This will fail to run. Note the function will also fail for large values of n.
+
+# vectorized version of dirwin.hall
+d.h<-function(){
+ f<-function(x,n){
+   vals<-sapply(x,function(x)dirwin.hall(x,n))
+   return(vals)
+ }
+ return(f)
+}
+
+
+
+
+dat.plot<-data.frame(x=c(0,5))
+g<-ggplot(dat.plot,aes(x=x))+
+  stat_function(fun=d.h(),args=list(n=5),color="blue")+
+  stat_function(fun=dnorm,args=list(mean=2.5,sd=sqrt(5/12)),color="orange")
+g
+```
+
+### your answer here
+
+```{r}
+nvals <- c(2, 3, 4, 5, 10)
+
+# Plot each distribution
+for (n in nvals) {
+  mu    <- n * 0.5
+  sigma <- sqrt(n/12)
+  
+  # Make a data frame that picks a suitable range for x: from 0 to n
+  dat <- data.frame(x = c(0, n))
+  
+  g <- ggplot(dat, aes(x = x)) +
+    stat_function(fun = d.h(), args = list(n=n), color="blue", size=1) +
+    stat_function(fun = dnorm, args = list(mean = mu, sd = sigma),
+                  color="orange", linetype="dashed", linewidth=1) +
+    coord_cartesian(xlim = c(0, n)) +
+    labs(
+      title = paste("Irwin-Hall density vs Normal Approx. for n =", n),
+      x = "y",
+      y = "Density"
+    )
+  
+  print(g)
+}
+```

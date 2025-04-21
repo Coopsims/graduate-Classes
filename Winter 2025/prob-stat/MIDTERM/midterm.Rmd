@@ -1,0 +1,380 @@
+---
+title: "Midterm Exercises"
+author: "Ben Funk"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Instructions
+
+Please work these problems on your own. You may use web searches and AI but must not receive help from other people, including classmates, instructors, and tutors, online or in person. In questions with code blocks, full credit will reserved for effective use of R to reach a correct solution.
+
+All parts are worth 5 points.
+
+# Question 1
+
+(Hypothetical) Medical researchers are testing two methods for managing neurological deficits due to a progressive neurodegenerative disorder. Method A is the novel method and method B is the standard of care. There are 50 subjects in the experiment. The subjects use method A for days 1 through 100,take a break from treatment, then use method B for days 111 through 210. The biological action of the methods is such that when either method is discontinued, its effects stop within 72 hours. Clinicians administer a coordination test on day 100 and day 210. If the result for a subject is better on day 100 than on day 210, this is recorded as a success for method A. If the result for a subject is better on day 210 than on day 100, this is recorded as a success for method B. The null hypothesis is that there is no difference between the methods. Consider the null model that the number of A's and B's follows a binomial distribution with the size equal to $50$ and the probability of a success for A equals to $0.5$ and the probability of a success for B equals to $0.5$. Let the probability of $k$ successes for A be computed as $f(k)=\left(\begin{array}{c}50\\k\end{array}\right)(0.5)^{50}$. Denote this probability space by $binomial(50,0.5)$.
+
+## Question 1, part 1
+
+Suppose the researchers find that there are 35 successes for A and 15 for B. They calculate that the probability of observing 35 or more successes for A or 35 or more successes for B under the null model is $0.0066$. Is this strong evidence that method A caused better coordination outcomes than method B?
+
+### your answer here
+
+```{r}
+n <- 50
+k <- 35
+p_one_tail <- pbinom(k - 1, n, 0.5, lower.tail = FALSE)
+p_value <- 2 * p_one_tail
+p_value
+```
+
+while this might be considered strong evidence normally, the lack of randomization means we cant be sure that med A is a success over med B.
+
+## Question 1, part 2
+
+Another team addressing the same question uses the *crossover* design that 25 patients are randomly assigned to use method A for days 1 through 100 and method B for days 111 through 210, while the other 25 patients use method B for days 1 through 100 and method A for days 111 through 210. Clinicians administer a coordination test on day 100 and day 210. Neither the subjects nor the clinicians know to which group a subject is assigned. After the tests are complete, if the result for a subject is better on the A day than on the B day, this is recorded as a success for method A. If the result for a subject is better on the B day than on the A day, this is recorded as a success for method B. Note that the null model above is applicable here for the null hypothesis that there is no difference between the methods.
+
+Consider the events $E_A=\{k|k\geq 33\}$ and $E_B=\{k|k\leq 17 \}$. What is the probability of the event $E_A\cup E_B$?
+
+### your answer here
+
+```{r}
+p_EA <- sum(dbinom(33:n, n, 0.5))
+p_EB <- sum(dbinom(0:17, n, 0.5))
+p_total <- p_EA + p_EB
+p_total
+```
+
+## Question 1, part 3
+
+Suppose these researchers find that there are 35 successes for A and 15 for B. They calculate that the probability of observing 35 or more successes for A or 35 or more successes for B under the null model is $0.0066$. Is this strong evidence that method A caused better coordination outcomes than method B?
+
+### your answer here
+
+Because this now has a randomized order, There is strong evidence that med A is better
+
+# Question 2
+
+Consider a deck of 5 cards labeled with the values $1$ through $5$. Suppose you shuffle the deck, draw one card, then another without replacing the first. You do this in such a way that any ordered pair of two distinct values $(a,b)$ with $\{a,b\}\in\{1,2,3,4,5\}$ is equally likely. Please define a reasonable probability space to model this experiment. You don't have to explain the model, just provide the values requested below.
+
+## Question 2, part 1
+
+What is the probability of single outcome $\left(a,b\right)$ with $a,b\in\{1,2,3,4,5\}$?
+
+### your answer here
+
+```{r}
+n_outcomes <- 5 * 4
+p_single <- 1 / n_outcomes
+p_single
+```
+
+this would be p(a)\*P(b) = 1/5 \* 1/4 = 1/20 so P((a,b)) = 1/20
+
+## Question 2, part 2
+
+What is the probability of the event $\{\left(a,b\right)|a\geq 2b\}$?
+
+### your answer here
+
+```{r}
+outcomes <- expand.grid(a = 1:5, b = 1:5)
+outcomes <- outcomes[outcomes$a != outcomes$b, ]
+valid_count <- nrow(outcomes[outcomes$a >= 2 * outcomes$b, ])
+p_event <- valid_count / nrow(outcomes)
+p_event
+```
+
+# Question 3
+
+Consider a continuous random variable $X$ with the probability density function defined by $f(x)=\frac{4}{x^5}$ for $x\in[1,\infty)$ and $f(x)=0$ otherwise.
+
+## Question 3, part 1
+
+What is cumulative distribution of $X$?
+
+### your answer here
+
+F(x) = 1-(1/x\^4) for x∈[1,∞) else 0
+
+## Question 3, part 2
+
+What is the expected value of $X$, $E[X]$?
+
+### your answer here
+
+```{r}
+E_X <- integrate(function(x) x * (4 / x^5), lower = 1, upper = Inf)$value
+E_X
+```
+
+taking the integral you get 4/3
+
+## Question 3, part 3
+
+What is the expected value of $X^2$, $E[X^2]$?
+
+### your answer here
+
+```{r}
+E_X2 <- integrate(function(x) x^2 * (4 / x^5), lower = 1, upper = Inf)$value
+E_X2
+```
+
+# Question 4
+
+Consider the probability space $(S,M,P)$ where $S=\{1,2,3,..12\}$, the set of events $M$ is the power set of $S$, and $P$ is defined by letting the density function $f:S\rightarrow [0,1]$ satisfy $f(s)=\frac{1}{12}$. Define the events $A=\{1,2,3,4,5,6\}$, $B=\{3,6,9,12\}$, and $C=\{4,5,6,10,11,12\}$.
+
+## Question 4, part 1
+
+Which of the pairs of events $(A,B)$, $(A,C)$, and $(B,C)$ is a pair of independent events?
+
+### your answer here
+
+```{r}
+S <- 1:12
+P <- rep(1/12, 12)
+
+# Define events:
+A <- c(1,2,3,4,5,6)
+B <- c(3,6,9,12)
+C <- c(4,5,6,10,11,12)
+
+# Compute probabilities:
+P_A <- length(A) / 12
+P_B <- length(B) / 12
+P_C <- length(C) / 12
+
+# Intersections:
+P_A_B <- length(intersect(A, B)) / 12
+P_A_C <- length(intersect(A, C)) / 12
+P_B_C <- length(intersect(B, C)) / 12
+
+# Q4 Part 1: Check independence for each pair:
+ind_A_B <- abs(P_A_B - (P_A * P_B)) < 1e-8
+ind_A_C <- abs(P_A_C - (P_A * P_C)) < 1e-8
+ind_B_C <- abs(P_B_C - (P_B * P_C)) < 1e-8
+ind_A_B  
+ind_A_C  
+ind_B_C  
+
+```
+
+all 3 are independent
+
+## Question 4, part 2
+
+Which of the pairs of events $(A\cap B,C)$, $(A\cap C,B)$, and $(B\cap C,A)$ is a pair of independent events?
+
+### your answer here
+
+```{r}
+A_int_B <- intersect(A, B)
+A_int_C <- intersect(A, C)
+B_int_C <- intersect(B, C)
+
+P_A_int_B <- length(A_int_B) / 12
+P_A_int_C <- length(A_int_C) / 12
+P_B_int_C <- length(B_int_C) / 12
+
+# Compute intersections with the third event:
+P_A_int_B_C <- length(intersect(A_int_B, C)) / 12
+P_A_int_C_B <- length(intersect(A_int_C, B)) / 12
+P_B_int_C_A <- length(intersect(B_int_C, A)) / 12
+
+# Check independence:
+ind_A_int_B_C <- abs(P_A_int_B_C - (P_A_int_B * P_C)) < 1e-8
+ind_A_int_C_B <- abs(P_A_int_C_B - (P_A_int_C * P_B)) < 1e-8
+ind_B_int_C_A <- abs(P_B_int_C_A - (P_B_int_C * P_A)) < 1e-8
+ind_A_int_B_C  
+ind_A_int_C_B  
+ind_B_int_C_A  
+```
+
+all 3 are independent
+
+# Question 5
+
+Suppose a data scientist is working with data modeled as a continuous random variable $X$. The data scientist has a candidate form for the cumulative distribution $F(t)$ of $X$. Suppose that $G$ is differentiable on $(-\infty,\infty)$ and satisfies $lim_{t\rightarrow\infty}G(t)=10$, $lim_{t\rightarrow -\infty}G(t)=4$, and $G'(t)\geq 0$ for all $t\in(-\infty,\infty)$. The data scientist would like to use $F(t)=aG(t)+b$. Please give values of $a$ and $b$ that make $F(t)$ a valid cumulative distribution function or explain why no such values exist.
+
+### your answer here
+
+$$
+4a + b = 0,\quad 10a + b = 1 \quad\Rightarrow\quad a = \frac{1}{6},\ b = -\frac{2}{3}.
+$$
+
+this makes it go from 0 to 1 without decreasing values meaning its a valid CFD
+
+# Question 6
+
+Consider a continuous random variable $X$ with the probability density function defined by $f(x)=c\frac{1}{x^2}$ for $x\in [5,\infty)$ and $f(x)=0$ otherwise.
+
+## Question 6, part 1
+
+What is the value of $c$? $$
+\int_{5}^{\infty} c \,\frac{1}{x^2}\,dx = 1 \Rightarrow c=5
+$$
+
+### your answer here
+
+## Question 6, part 2
+
+What is the value of $E[X]$?
+
+### your answer here
+
+```{r}
+# E_X_val <- integrate(function(x) x * (5 / x^2), lower = 5, upper = Inf)
+# E_X_val
+```
+
+This diverges so E[X] = $\infty$
+
+# Question 7
+
+Consider the data below.(Your answers should be based on the values in the sample, not the properties of the gamma distribution.)
+
+```{r}
+set.seed(12345)
+v<-rgamma(30,shape=6,scale=2)
+```
+
+## Question 7, part 1
+
+If you model the data as a sample from a Normal distribution, what is the maximum likelihood estimate for the $\mu$ in the density $f(x)=\frac{1}{\sqrt{2\pi\sigma^2}}\exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right)$?
+
+### your answer here
+
+```{r}
+
+mu_hat <- mean(v)
+mu_hat
+```
+
+## Question 7, part 2
+
+If you model the data as a sample from a Normal distribution, what is the maximum likelihood estimate for the $\sigma^2$ in the density $f(x)=\frac{1}{\sqrt{2\pi\sigma^2}}\exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right)$?
+
+### your answer here
+
+```{r}
+n <- length(v)
+sigma2_hat <- sum((v - mu_hat)^2) / n
+sigma2_hat
+```
+
+## Question 7, part 3
+
+Please plot the data with a density histogram (In ggplot, try "geom_histogram(aes(y=after_stat(density))"). On the same plot, please plot the density function of the Normal distribution with the mean equal to the maximum likelihood value of the mean computed above and variance equal to the maximum likelihood value of the mean computed above
+
+### your answer here
+
+```{r}
+
+library(ggplot2)
+
+df <- data.frame(x = v)
+
+mu_hat <- mean(df$x)
+sigma2_hat <- sum((df$x - mu_hat)^2) / n
+sigma_hat <- sqrt(sigma2_hat)
+
+ggplot(df, aes(x = x)) +
+  geom_histogram(aes(y = after_stat(density)), 
+                 bins = 10, # or pick another
+                 color = "black", fill = "lightblue") +
+  stat_function(fun = dnorm, 
+                args = list(mean = mu_hat, sd = sigma_hat),
+                color = "red", linewidth = 1) +
+  theme_minimal() +
+  labs(x = "Value", y = "Density",
+       title = "Gamma data histogram + Normal MLE fit")
+```
+
+# Question 8
+
+Please use the data "dat.birth.RData" provided with this assignment and with problem set 4 for these questions.
+
+## Question 8, part 1
+
+Please generate a data frame which is restricted to cases with DPLURAL equal to 1, GESTREC10\<20 and MAGER equal to 42.(Hint: you should have 1812 cases in your data.)
+
+### your answer here
+
+```{r}
+load("dat.birth.RData")
+df_sub <- subset(dat.birth,
+                 DPLURAL == 1 & GESTREC10 < 20 & MAGER == 42)
+nrow(df_sub)
+```
+
+## Question 8, part 2
+
+Please find the slope and intercept for the least squares best fit line for the model
+
+"DBWT"=m("GESTREC10")+b
+
+fit to your restricted data.
+
+These variables represent birth weight in grams and a gestational age group.
+
+### your answer here
+
+```{r}
+
+fit <- lm(DBWT ~ GESTREC10, data = df_sub)
+coef(fit)
+```
+
+## Question 8, part 3
+
+Make a scatterplot from your data with the "GESTREC10" variable on the horizontal axis and the "DBTW" variable on the vertical axis. Add in the line computed above. (If you used the built-in function, please extract the values of the slope and intercept from the fitted model object, rather than using copy-paste.) For full credit, please use a strategy to aid visualization of regions of the plot with many points. You may want to consider using "geom_jitter" or "geom_point" with the "alpha" argument.
+
+### your answer here
+
+```{r}
+library(ggplot2)
+ggplot(df_sub, aes(x = GESTREC10, y = DBWT)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  theme_minimal()
+```
+
+## Question 8, part 4
+
+Please display the mean value of "DBWT" in each "GESTREC10" level? (For full credit, please do this without looping through the "GESTREC10" values either manually or with a for-statement. You can use "summarize" from dplyr, with group_by.)
+
+### your answer here
+
+```{r}
+library(dplyr)
+
+df_sub %>%
+  group_by(GESTREC10) %>%
+  summarize(mean_dbwt = mean(DBWT))
+```
+
+# Question 9
+
+Data on a measurement can come in the form of the minimum of that measurement over multiple observations. To explore this, please sample 5 values from the uniform distribution on [0,1] using "runif". Repeat this 10 times and create a matrix of the values with the first sample of 5 in the first row, the second in the second row, and so on. The "byrow" argument to the "matrix" function may be useful. Then, please add a column to the right side of the matrix using "cbind" giving the minimum in the row. Please display the matrix.
+
+### your answer here
+
+```{r}
+set.seed(12345)
+v <- runif(50)
+
+mat <- matrix(v, nrow=10, ncol=5, byrow=TRUE)
+
+mat_min <- cbind(mat, apply(mat, 1, min))
+
+mat_min
+```

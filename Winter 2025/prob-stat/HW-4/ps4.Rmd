@@ -1,0 +1,308 @@
+---
+title: "Problem Set 4"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(HistData)
+library(ggpubr)
+```
+
+## Introduction
+
+These questions were rendered in R markdown through RStudio (<https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf>, <http://rmarkdown.rstudio.com> ).
+
+Please generate your solutions in R markdown and upload both a knitted doc, docx, or pdf document in addition to the Rmd file.
+
+### Collaboration
+
+(5 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself: nope
+
+### AI
+
+(5 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools: o3 mini (openAI)
+
+## Question 1
+
+### Definitions
+
+Let $S$ be a finite population of size $N$ with identifiers $1,2\ldots N$ and let $x_1, x_2, \ldots, x_N$ be positive weights associated with the corresponding units. Let $X=\sum_{j=1}^N x_j$ and let \$p_i = x_i /X \$. Let $n$ be the size of a sample to be drawn without replacement. The goal is to draw the sample in such a way that the probability that item $j$ is included in the sample equals $\alpha x_j$ for a fixed $\alpha$. The article
+
+Hartley, H. O., and J. N. K. Rao. "Sampling with Unequal Probabilities and without Replacement." The Annals of Mathematical Statistics, vol. 33, no. 2, 1962, pp. 350--74. JSTOR, <http://www.jstor.org/stable/2237517>. Accessed 31 Jan. 2025.
+
+describes a method for doing this.
+
+### Method from Hartley and Rao
+
+The method, in the notation above, requires that $np_i<1$ for all $i$. The method is as follows:
+
+1.  Arrange the units in a random order. Let $j_1, j_2, \ldots, j_N$ be the identifiers of the units in this order. Form the sequence of partial sums $\Pi_0,...\Pi_N$ with $\Pi_0=0$ and $\Pi_i=\sum_{i=1}^n p_{j_i}$ for $i=1,2,\ldots,N$.
+
+2.  Generate a random number $d$ from the uniform distribution on $(0,1)$. Let $d_k=d+(k-1)$ for $k=1,2,\ldots,n$. Let $i_k$ be the smallest $i$ such that $\Pi_{j_i}> d+k$. The sample consists of the units with identifiers $j_{i_1}, j_{i_2}, \ldots, j_{i_n}$.Note that because $np_i<1$ for all $i$, each unit will be in the sample at most once
+
+### Example data
+
+An example of a valid collection of weights is given below. The index of the vector `x` corresponds to the unit identifier, and the value of `x` at that index is the weight of the unit.
+
+```{r}
+x<-rep(c(1,2,3,4,6,6),times=c(121,20,5,3,1,1))
+X<-sum(x)
+N<-length(x)
+dat<-data.frame(unit=1:N,weight=x)
+n<-30
+p<-x/X
+```
+
+### Question 1, part 1
+
+(5 points)
+
+Please give code that shows computation verifying the condition $np_i<1$ for all $i$.
+
+```{r}
+# Compute n * p for each unit
+np_values <- n * p
+
+# Check if all values are less than 1
+condition_check <- all(np_values < 1)
+print(condition_check)  
+```
+
+### Question 1, part 2
+
+(5 points)
+
+Consider the experiment that a sequence of $30$ items is generated *with replacement* in such a way that the items at each position are mutually independent and the probability that the item in position $k$ equals the $i^{th}$ item is $p_i$ as specified in the example data. What is the probability that item $151$ is in the sample at least once?
+
+#### your answer here
+
+```{r}
+prob_item151 <- 1 - (1 - p[151])^30
+print(prob_item151)
+
+```
+
+### Question 1, part 3
+
+(5 points)
+
+The function below implements the method, returning the identifiers of the selected units.
+
+```{r}
+units.sample<-function(x,n){
+  N<-length(x)
+  p<-x/sum(x)
+  j<-sample(1:N)
+  p.i<-n*cumsum(p[j])
+  d<-runif(1)
+  dk<-d+0:(n-1)
+  j.index<-sapply(dk,function(m){min(which(p.i>m))})
+  units.selected<-j[j.index]
+  return(units.selected)
+}
+```
+
+The code below generates $10,000$ samples of size $30$ using the method and stores the results in the matrix `units.gps`. For a given unit $k$ The function `unit.prob` calculates the proportion of the samples that include the unit $k$. The function `unit.probs` calculates these proportions for all units. The code then plots these proportions as a function of the unit identifier. Note that the proportion of times that unit $151$ is included these samples is the empirical probability that unit $151$ is included in the sample and is very different from the probability calculated in part 2.
+
+```{r}
+set.seed(123456)
+#units.sample(x,n)
+units.gps<-replicate(10000,units.sample(x,n))
+
+
+unit.prob<-function(k){
+  return(mean(apply(units.gps,2,function(x){k%in%x})))
+}
+
+unit.probs<-sapply(1:N,unit.prob)
+ggplot(data.frame(unit.probs),aes(x=1:N,y=unit.probs))+geom_point()+geom_line()
+```
+
+Consider each of the 5 distinct weights $w_1,\ldots w_5$ in the example data. To each weight $w_i$, associate the mean of the proportions calculated above for units with weight $w_i$. Please generate and display a data frame with a column for the weights and a column for the associated means.
+
+#### your answer here
+
+```{r}
+# Create a data frame with unit, weight, and empirical inclusion probability
+df_emp <- data.frame(unit = 1:N, weight = x, emp_prob = unit.probs)
+
+# Group by weight and compute the mean empirical probability for each weight
+df_summary <- df_emp %>%
+  group_by(weight) %>%
+  summarise(mean_emp_prob = mean(emp_prob))
+print(df_summary)
+```
+
+### Question 1, part 4
+
+(5 points)
+
+The claim in Hartley and Rao is that the probability that item $j$ is included in the sample, $\pi_j=\alpha x_j=\frac{n}{X}x_j$. Please check this by calculating the empirical value of $\alpha$ for weight $w_j$ using the known $x_j$, $X$, and $n$, the value of $\pi_j$ estimated above. Are these values close the the theoretical value of $\alpha$?
+
+#### your answer here
+
+Yes they are all within about 0.001 to 0.002
+
+```{r}
+df_emp <- df_emp %>% mutate(theo_prob = (n / X) * weight)
+
+comparison <- df_emp %>%
+  group_by(weight) %>%
+  summarise(mean_emp = mean(emp_prob),
+            theo_prob = unique(theo_prob))
+print(comparison)
+
+```
+
+## Question 2
+
+The data used here are all recorded live births in the United States in January of 2022. The data were extracted on 4/15/2024 from <https://www.cdc.gov/nchs/data_access/vitalstatsonline.htm#Births> for Nat2022PublicUS.c20230504.r20230822.txt, (2022 births) and UserGuide2022.pdf
+
+The columns used here are `DPLURAL` (delivery plural), `DBWT` (birth weight in grams), `GESTREC10` (gestational age in completed weeks), and `MAGER` (mother's age in years).
+
+The labels for the variable `GESTREC10` were derived from fiollowing sources:
+
+<https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2013/11/definition-of-term-pregnancy>
+
+<https://www.who.int/news-room/fact-sheets/detail/preterm-birth>
+
+### Question 2, part 1
+
+(5 points)
+
+Please create and display a histogram of the birth weights in the data. Does there seem to be a number that codes that `DBWT` is missing? If so, what is that number?
+
+#### your answer here
+
+it appears to be 9999 is the placeholder
+
+```{r}
+load("dat.birth.RData")
+ggplot(dat.birth, aes(x = DBWT)) +
+  geom_histogram(bins = 30, fill = "lightblue", color = "black") +
+  labs(title = "Histogram of Birth Weights", x = "Birth Weight (grams)", y = "Frequency")
+
+print(summary(dat.birth$DBWT))
+# - print(table(dat.birth$DBWT)) to save like 50 pages I commented this out
+```
+
+### Question 2, part 2
+
+(5 points)
+
+Please filter the data to include only cases that are full term, label=="full term", deliveries of a single infant, (DPLURAL==1), with a weight ,DBWT, less than 7000 grams to a mother of age 45, MAGER==45. Create a density histogram of these birth weights. By whatever means you prefer, estimate a reasonably well-fitting Normal density. Display the density histogram with the Normal density function. Does the distribution of birth weights appear to be approximately normal? Some histograms of standard normal samples are also provided for comparison.
+
+#### your answer here
+
+Yes this does mostly appear to be a normal dist
+
+```{r}
+# Filter data for:
+# - Full term deliveries (label == "full term")
+# - Single infant deliveries (DPLURAL == 1)
+# - DBWT less than 7000 grams
+# - Mother's age (MAGER) equal to 45
+dat_filtered <- dat.birth %>%
+  filter(label == "full term", DPLURAL == 1, DBWT < 7000, MAGER == 45)
+
+mu <- mean(dat_filtered$DBWT, na.rm = TRUE)
+sigma <- sd(dat_filtered$DBWT, na.rm = TRUE)
+
+ggplot(dat_filtered, aes(x = DBWT)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "lightblue", color = "black") +
+  stat_function(fun = dnorm, args = list(mean = mu, sd = sigma), color = "red", linewidth = 1) +
+  labs(title = "Density Histogram of Birth Weights with Normal Fit",
+       x = "Birth Weight (grams)", y = "Density")
+
+```
+
+```{r}
+set.seed(98765)
+norm.sample<-rnorm(9*n)
+dat.norm<-data.frame(subsample=rep(letters[1:9],n),x=norm.sample)
+
+ggplot(dat.norm,aes(x=x))+geom_histogram(aes(y=after_stat(density)),bins=20)+
+  stat_function(fun=dnorm,args=list(mean=0,sd=1),color="red")+
+  facet_wrap(~subsample)
+```
+
+## Question 3
+
+### Question 3, part 1
+
+(5 points)
+
+Consider the probability space $(S,M,P)$ in which $S=\mathbb{R}^2$, $M$ includes all rectangles in $\mathbb{R}^2$, and $P((a,b)\times(c,d))=\int_a^b\frac{1}{\sqrt{2\pi(3^2)}}\exp{\left(-\frac{(x-1)^2}{2(3^2)}\right)}\left[\int_c^d\frac{1}{\sqrt{2\pi}}\exp{\left(-\frac{y^2}{2}\right)dy}\right]dx$. This follows standard mathematical notation in that the integral within the parentheses is evaluated first.
+
+Let $A$ be the event $\{(x,y):x\in(0,2)\}$, or equivalently, $\{(x,y):x\in(0,2)\wedge y\in (-\infty,\infty) \}$ and let $B$ be the event $\{(x,y):y\in(-1.5,1.5)\}$.
+
+Are $A$ and $B$ independent in this probability space?
+
+Please use `pnorm` to calculate the probabilities of the events $A$ and $B$.
+
+#### your answer here
+
+yes they are independent in this space
+
+```{r}
+# For event A: X ~ N(1, 3^2) and we require 0 < x < 2
+p_A <- pnorm(2, mean = 1, sd = 3) - pnorm(0, mean = 1, sd = 3)
+print(p_A)  # Probability of event A
+
+# For event B: Y ~ N(0, 1) and we require -1.5 < y < 1.5
+p_B <- pnorm(1.5, mean = 0, sd = 1) - pnorm(-1.5, mean = 0, sd = 1)
+print(p_B)  # Probability of event B
+
+p_A_and_B <- p_A * p_B
+print(p_A_and_B)
+
+```
+
+### Question 3, part 2
+
+(5 points)
+
+Consider the sample from the probability space $(S,M,P)$ generated below. What is the empirical probability of $A$? That is, what proportion of the sample consists of outcomes from the event $A$? What is the empirical probability of $B$? What is the empirical probability of $A$ and $B$? Are $A$ and $B$ independent in the empirical probability space?
+
+```{r}
+set.seed(123456)
+n<-200
+x<-rnorm(n,1,3)
+y<-rnorm(n)
+dat<-data.frame(x=x,y=y)
+```
+
+#### your answer here
+
+the probability is close as .21 is .0036 off from 0.2064, if we go by p level of 0.005 then we can say they are likely independent, as the empirical data supports the conclusion
+
+```{r}
+
+# Empirical probability for event A: x in (0,2)
+emp_A <- mean(dat$x > 0 & dat$x < 2)
+print(emp_A)
+
+# Empirical probability for event B: y in (-1.5,1.5)
+emp_B <- mean(dat$y > -1.5 & dat$y < 1.5)
+print(emp_B)
+
+# Empirical probability for A and B: both conditions hold
+emp_A_B <- mean((dat$x > 0 & dat$x < 2) & (dat$y > -1.5 & dat$y < 1.5))
+print(emp_A_B)
+
+emp_product <- emp_A * emp_B
+print(emp_product)
+
+```

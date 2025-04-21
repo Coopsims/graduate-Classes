@@ -1,0 +1,328 @@
+---
+title: "Problem Set 1"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggpubr)
+library(foreign)
+library(car)
+
+```
+
+
+# Introduction
+
+Please complete the following tasks regarding the data in R. Please generate a solution document in R markdown and upload the .Rmd document and a rendered  .doc, .docx, or .pdf document. Please turn in your work on Canvas. Your solution document should have your answers to the questions and should display the requested plots.
+
+### Collaboration
+
+(2 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself:
+None
+### AI
+
+(3 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools:
+GPT
+# Question 1
+
+The data in this question were downloaded April 3, 2025 from https://data.oecd.org/earnwage/gender-wage-gap.htm , a web presence of the Organisation for Economic Co-operation and Development (OECD).
+
+The portion produced here gives data from 2023 for a subset of the countries. The OBS_VALUE variable is the difference between the median income for men in the country and the median income for women in the country, as a percent of the median income for men in that country. I selected group identifiers for the countries.
+
+The goal of this question is to test the hypothesis that the OBS_VALUE's in the groups are consistent with samples from a $Normal(\mu,\sigma ^2)$ distribution.
+
+## Question 1, part 1
+
+Please check the assumption that the OBS_VALUE's in each of the groups (SA, CW, EE) are consistent with samples from a normal distribution. You may use Q-Q plots or hypothesis tests to assess normality.
+
+### your answer here
+(5 points)
+
+```{r}
+load("wage_gap.RData") 
+```
+
+```{r}
+by(dat.gap$OBS_VALUE, dat.gap$group, shapiro.test)
+```
+since the P-values are well above 0.05 we can not reject the hypthesis for any group meaning that nove of them have a significant departure from normality.
+
+
+## Question 1, part 2
+
+(5 points)
+
+Please check the assumption of equal variances across the groups (SA, CW, EE). You may use visualization or a hypothesis test. Please provide your conclusion.
+
+```{r}
+boxplot(OBS_VALUE ~ group, data = dat.gap)
+```
+This doesnt look the best but we can run a test to see
+```{r}
+bartlett.test(OBS_VALUE ~ group, data = dat.gap)
+```
+as the value is well above 0.05 there is no evidence the variance statistically differs among the groups
+
+
+## Question 1, part 3
+
+(5 points)
+
+Please carry out an ANOVA to test the hypothesis that the means of the OBS_VALUE's in the groups (SA, CW, EE) are equal. Please provide the ANOVA table and interpret the results, taking into account your responses to parts 1 and 2.
+
+```{r}
+m.wage <- aov(OBS_VALUE ~ group, data = dat.gap)
+summary(m.wage)
+```
+
+The no value is well above 0.05 so we failed to reject the no hypothesis which aligns with the findings from part one and part two so there is no statistical significance in mean wage gap across the three groups.
+
+# Question 2
+
+The interpretation of two-way or multi-way ANOVA models can be complicated, especially when the data are unbalanced, that is, have unequal counts of observations in the cells. In this question, you will explore reporting methods unbalanced two-way ANOVA.
+
+For comparison, the code below generates a balanced data set for a two-way ANOVA and gives summaries of aov models with the factors in different orders. 
+
+Here we generate example data in a convenient way.
+
+```{r}
+a<-3 # Number of levels for factor A
+b<-2 # Number of levels for factor B
+set.seed(45678)
+n<-10 # Number of observations per cell
+# Generate a balanced data set
+factorA <- rep(1:a, each = b * n) # Levels of factor A
+factorB <- rep(rep(1:b,times = a*n)) # Levels of factor B
+# Generate random data for each cell
+y <- rnorm(a * b * n, mean = 0, sd = 2) # Random normal data
+# Create a data frame
+dat.balanced <- data.frame(
+  #y = y+factorA*0.5+factorB*2,
+  y = y+factorA+factorB*2,
+  factorA = factor(factorA),
+  factorB = factor(factorB)
+)
+table(dat.balanced$factorA,dat.balanced$factorB) # Check the levels of factor A)
+```
+
+Observe the results of different calls to `aov` with the balanced data. Note whether the order of factors in the model affects the results.
+
+```{r}
+m.balanced<-aov(y ~ factorA*factorB, data = dat.balanced) # Fit the ANOVA model
+summary(m.balanced) # Display the ANOVA summary
+
+m.balanced.rev<-aov(y ~ factorB*factorA, data = dat.balanced) # Fit the ANOVA model
+summary(m.balanced.rev)
+```
+Create unbalanced data.
+
+```{r}
+set.seed(7890)
+dat.off<-dat.balanced[sample(1:nrow(dat.balanced),size=45,replace=FALSE),] # Randomly sample 45 rows from the balanced data to illustrate unbalanced data
+
+table(dat.off$factorA,dat.off$factorB)
+
+dat.off$A.B<-factor(dat.off$factorA:dat.off$factorB) # Create a new factor for the interaction of factor A and factor B
+```
+
+## Question 2, part 1
+
+(5 points)
+
+Check that the distribution of the response variable `y` in the unbalanced data set `dat.off` is consistent with samples from a normal distribution for each level of the interaction of factor A and factor B (i.e., `A.B`). You may use visual or statistical methods to assess normality and homogeneity of variance. Please provide your conclusions.
+
+### your answer here
+
+
+```{r}
+by(dat.off$y, dat.off$A.B, shapiro.test)
+
+bartlett.test(y ~ A.B, data = dat.off)
+
+```
+all values are above 0.05 so everything looks all good for normality
+
+
+## Question 2, part 2
+
+(5 points)
+
+Please carry out a two way ANOVA on the unbalanced data set `dat.off` using the `aov` function in R. Fit the model with both factors (factorA and factorB) in the order of `factorA` first, then `factorB`. Provide the ANOVA table and interpret the results. Then fit the model again with the factors in the reverse order (i.e., `factorB` first, then `factorA`) and provide the ANOVA table. Are the results from the two models the same? 
+
+### your answer here
+
+```{r}
+m1 <- aov(y ~ factorA + factorB, data=dat.off)
+summary(m1)
+m2 <- aov(y ~ factorB + factorA, data=dat.off)
+summary(m2)
+```
+The values differ which is expected from a type 1 test.
+
+## Question 2, part 3
+
+(5 points)
+
+The the Sum of Squares in top line in each of the ANOVA tables above has a direct relation to one-way tables. Please use the output generated below to give a simple description of the sum of squares for the factor in the unbalanced ANOVA models. 
+
+```{r}
+m.unbalanced.a<-aov(y ~ factorA, data = dat.off) # Fit the ANOVA model on the unbalanced data
+summary(m.unbalanced.a) # Display the ANOVA summary for the unbalanced data
+m.unbalaced.b<-aov(y ~ factorB, data = dat.off) # Fit the ANOVA model on the unbalanced data for factor B
+summary(m.unbalaced.b) # Display the ANOVA summary for the unbalanced data for factor B
+```
+These match the top line sums of squares from the two‐factor ANOVAs when that factor is entered first. meaning, the first factor in the model formula “takes up” the same sum of squares it would get if modeled alone.
+
+
+## Question 2, part 4
+
+(5 points)
+
+Moving on to the second line in the ANOVA table for aov(y ~ factorA+factorB, data = dat.off), one might speculate that the sum of squares for factor B in the unbalanced ANOVA model is computed by subtracting the mean of the factor A groups from each response variable, and then computing the sum of squares for factor B on this adjusted response variable. Please perform and report the result of this calculation. Does this speculation hold? 
+
+
+### your answer here
+
+```{r}
+# Add a column of the means for each group of factor A to the data set 
+dat.off<-dat.off %>% group_by(factorA) %>%mutate(mean.a=mean(y)) %>% ungroup()
+
+# Subtract the mean of the factor A group from the response variable
+dat.off$y.no.a <- dat.off$y - dat.off$mean.a 
+# Add a column of the means of the y.no.a grouped by factor B to the data set
+dat.off<-dat.off %>% group_by(factorB) %>% mutate(y.no.a.mean.b=mean(y.no.a)) %>% ungroup() 
+
+# Then look at how factor B partitions the sum of squares in y.no.a
+tapply(dat.off$y.no.a, dat.off$factorB, function(x) sum((x - mean(x))^2)) %>%
+  sum()
+```
+The values are not the same, therefore, you cannot simply subtract factor A's mean from why and then measure factor be some of squares for unbalanced data in a Type I ANOVA.
+
+
+## Question 2, part 5
+
+(5 points)
+
+Another way to look for the sum of squares for factor B in the unbalanced ANOVA aov(y ~ factorA+factorB, data = dat.off) is subtract the residual sum of squares from the full model (which includes both factors) from the residual sum of squares of a model that includes only factor A. This can be done by fitting both models and then comparing their residual sums of squares.
+
+Does this computation reproduce the sum of squares for factor B in the second line of the ANOVA table? Please show your work and provide a conclusion.
+
+## your answer here
+
+```{r}
+# This value extraction syntax may be useful.
+# Model with factorA only:
+mA <- aov(y ~ factorA, data=dat.off)
+RSS_A <- sum(resid(mA)^2)
+
+# Model with factorA + factorB:
+mAB <- aov(y ~ factorA + factorB, data=dat.off)
+RSS_AB <- sum(resid(mAB)^2)
+
+# Difference
+SS_B_by_subtraction <- RSS_A - RSS_AB
+SS_B_by_subtraction
+
+summary(m.unbalanced.a)[[1]]$Sum[2]
+
+
+```
+
+yes, in a Type I ANOVA, subtracting the residual SS of the bigger model from the residual SS of the smaller model reproduces the sum of squares for factor B.
+
+
+This does beg the question of how `m.unbalanced.a.b` is fit. This is most easily understood with multiple regression, soon to come.
+
+## Question 2, part 6
+
+(5 points)
+
+Type I ANOVA is one reporting method for multi-way ANOVA. To calculate the sum of squares for a the current factor, it computes the Residual Sum of Squares for the ANOVA with the variables that are earlier in full model formula and do not include the current factor. From this it subtracts the Residual Sum of Squares for the ANOVA with the variables that are earlier in full model formula together with the current factor.
+
+Please derive the sum of squares for the interaction of factor A and factor B, using the Residual Sum of Squares of the full model and the model without the interaction term according to the type I ANOVA approach. 
+
+### your answer here
+
+```{r}
+mAB_int <- aov(y ~ factorA*factorB, data=dat.off)
+RSS_full <- sum(resid(mAB_int)^2)
+
+m_no_int <- aov(y ~ factorA + factorB, data=dat.off)
+RSS_no_int <- sum(resid(m_no_int)^2)
+
+SS_interaction <- RSS_no_int - RSS_full
+SS_interaction
+
+```
+The difference is 9.9442, which is exactly the interaction sum of squares in the full Type I ANOVA
+
+
+## Types II and III ANOVA
+
+The sums of squares and F-tests for the factors in an unbalanced ANOVA can be computed using type II ANOVA or type III ANOVA. Type II ANOVA is generally used when there are no interactions, while type III ANOVA is used when there are interactions. 
+
+In type II ANOVA, the sum of squares for each factor is computed by fitting a model that includes all factors except the current one and interactions with the current one, and then comparing it to a model that includes the current factor.
+
+```{r}
+library(car)
+m.off<-lm(y ~ factorA*factorB, data = dat.off) # Fit the linear model for the unbalanced data
+car::Anova(m.off, type = 2) # Type II ANOVA for the linear model
+```
+
+Please identify the sum of squares for factor A and factor B using type II ANOVA by finding them in the aov models above. For example the type II ANOVA for factor A is the sum of squares for factor A in type I model factor B first, then factor A
+
+### your answer here
+
+Sum of squares for factor B?
+
+```{r}
+anova_type2 <- car::Anova(m.off, type = 2)
+
+# Print the whole table to see row names and columns
+anova_type2
+
+# Extract the SS for factorB from the table
+SS_factorB <- anova_type2["factorB", "Sum Sq"]
+SS_factorB
+```
+
+For the interaction of factor A and factor B?
+
+```{r}
+# Extract the SS for the interaction "factorA:factorB"
+SS_interaction <- anova_type2["factorA:factorB", "Sum Sq"]
+SS_interaction
+```
+
+so all put together we get
+SS(A) = 47.133
+SS(B) = 10.48177
+SS(A:B) = 9.944206
+
+This confirms that Type II partitions the sums of squares differently from the Type I approach.
+
+
+### Type III ANOVA 
+
+
+There is also a type III ANOVA. The definitions for type III ANOVA are beyond the scope of this problem set
+
+### for information only
+
+```{r}
+car::Anova(m.off, type = 3) 
+```
+
+
+

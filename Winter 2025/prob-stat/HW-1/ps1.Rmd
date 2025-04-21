@@ -1,0 +1,172 @@
+---
+title: "Problem Set 1"
+author: "Ben Funk"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+library(HistData)
+```
+
+## Introduction
+
+These questions were rendered in R markdown through RStudio (<https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf>, <http://rmarkdown.rstudio.com> ).
+
+Please generate your solutions in R markdown and upload both a knitted doc, docx, or pdf document in addition to the Rmd file.
+
+RStudio may ask you to install packages when you run this code. Accepting the request will allow you to proceed.
+
+From an Rmd file in RStudio, you can generate a word document by selecting the "Knit to Word" option next to the "Knit" icon in the toolbar above the edit window.
+
+### Collaboration
+
+(5 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself:
+
+None
+
+### AI
+
+(5 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools:
+
+None
+
+## Load Data
+
+```{r}
+data("PolioTrials")
+dat<-PolioTrials
+dat
+```
+
+## Question 1
+
+Please carry out the analysis below and answer the questions that follow. For this assignment, you may add additional code to calculate requested values that aren't in the output of the included code or you may generate them offline and type them in.
+
+### Frame Question
+
+The basic question "did the vaccine work?" was addressed in class using the data from the randomized control trial of the Salk vaccine. The count of paralytic polio cases in the vaccinated group was compared to the counts that were produced under the null hypothesis that the vaccine had no effect on the incidences of paralytic polio. The second model examined in class for this null hypothesis was that each paralytic polio case the pooled treatment and placebo group was assigned to the treatment group with probability equal to the ratio of the size of the treatment group to the size of pooled treatment and placebo group.
+
+Below, the concept used in that analysis is used to address the question of whether the rate of paralytic polio among all polio cases in the "Vaccinated" group in the "RandomizedControl" experiment is consistent with the null hypothesis that the proportion of paralytic polio cases is the same in the "Vaccinated" and "Placebo" groups.
+
+Recall rbinom(n,ct,prop) is a function that models the number of random assignments to the distinguished group from a population of size "ct" if the probability of assignment to the distinguished group is "prop". The value of "n" is the number of times to repeat the experiment.
+
+### Q1, part 1
+
+(5 points)
+
+-   What is the proportion of paralytic polio cases among the polio cases in the "Vaccinated" group in the "RandomizedControl" experiment?
+
+    -   0.5789
+
+-   What is the proportion of paralytic polio cases among the polio cases in the "Placebo" group in the "RandomizedControl" experiment?
+
+    -   0.8098
+
+```{r}
+paralytic.proportion<-dat$Paralytic/(dat$Paralytic+dat$NonParalytic)
+names(paralytic.proportion)<-dat$Group
+paralytic.proportion
+```
+
+### Q1, part 2
+
+(10 points)
+
+We can use the statistic of the observed number of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment to test the null hypothesis that the vaccine had no effect on the proportion of paralytic polio. The null hypothesis is that the rate of paralytic polio cases is the same in the "Vaccinated" and "Placebo" groups. The probability model that the paralytic cases were assigned randomly to the "Vaccinated" and "Placebo" groups in the "RandomizedControl" experiment in the proportion of the number of polio cases of either type is used to generate 10,000 counts of paralytic polio cases in the "Vaccinated" group. The proportion of the simulated counts of paralytic polio in the "Vaccinated" group that are less than or equal to the observed count is calculated.
+
+The code below generates the simulated counts of paralytic polio cases in the "Vaccinated" group and plots a histogram of the simulated counts. The proportion of the simulated counts of paralytic polio in the "Vaccinated" group that are less than or equal to the observed count is calculated.
+
+Based on this simulation, what is the approximate probability of generating a value less that or equal to the observed number of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment under this model?
+
+it is 0.0538
+
+#### Simulation
+
+```{r}
+n<-10000 # number of simulations
+
+# Total number of polio cases in the "Vaccinated" group and the "Placebo" group in the "RandomizedControl" experiment.
+case.total<-sum(dat$Paralytic[1:2])+sum(dat$NonParalytic[1:2])
+
+# Calculate the proportion "vaccinated.case.proportion" of the the pooled "Vaccinated" and "Placebo" cases that are in the "Vaccinated" group.
+
+vaccinated.case.proportion<-(dat$Paralytic[1]+dat$NonParalytic[1])/case.total
+
+# Calculate "paralytic.total", the total number of paralytic polio cases in the "Vaccinated" group and "Placebo" group together in the "RandomizedControl" experiment.
+
+paralytic.total<-dat$Paralytic[1]+dat$Paralytic[2]
+
+
+# Generate 10,000 counts of paralytic polio cases in the vaccination group under the model that each paralytic polio case in the pooled vaccination and placebo group has probability "prop" of being assigned to the vaccination group.
+set.seed(45678765)
+sim<-rbinom(n,paralytic.total,vaccinated.case.proportion)
+
+# Plot a histogram of the simulated counts.
+dat.sim<-data.frame(sim=sim)
+ggplot(dat.sim, aes(x=sim))+geom_histogram(bins=20)
+# Calculate the proportion of the simulated counts of paralytic polio in the "Vaccinated" group that are less than or equal to the observed count:
+mean(sim<=dat$Paralytic[1])
+```
+
+### Q1, part 3
+
+(5 points)
+
+The function pbinom(k,ct,prop) is a function that returns th probability of "k" or fewer random assignments to the distinguished group from a population of size "ct" if the probability of assignment to the distinguished group is "prop".
+
+Based on calculation below, what is the exact probability of generating the observed number of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment under this model?
+
+it is 0.0504
+
+```{r}
+pbinom(dat$Paralytic[1],paralytic.total,vaccinated.case.proportion)
+```
+
+### Q1, part 4
+
+(5 points)
+
+Please discuss the strength of the evidence calculated above against the null hypothesis that the vaccine had no effect on the proportion of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment.
+
+if we are testing on a threshold of alpha = 0.05 we cant reject the null as we aren't below 0.05 meaning we cant make any assumptions about the results. since it is close we know it is nearly significant as on a 905 confident test it would have been accepted.
+
+## Question 2
+
+Suppose we use the proportion of paralytic polio cases in the "NotInnoculated" group in the "RandomizedControl" experiment as an estimate of the proportion of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment and simulate the number of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment under the null hypothesis that the probability of paralytic polio for each case in the "Vaccinated" group is the same equal to the proportion of paralytic polio for among cases in the "NotInnoculated" group.
+
+```{r}
+paralytic.proportion.not.innoculated<-paralytic.proportion[3]
+paralytic.proportion.not.innoculated
+```
+
+The probability of generating less than or equal to the observed number of paralytic polio cases in the "Vaccinated" group in the "RandomizedControl" experiment under this model is calculated below.
+
+```{r}
+pbinom(dat$Paralytic[1],dat$Paralytic[1]+dat$NonParalytic[1],paralytic.proportion.not.innoculated)
+```
+
+### Q2, part 1
+
+(10 points)
+
+On the basis of the calculations above, is there strong evidence against the null hypothesis that the probability of paralytic polio among polio cases in the "Vaccinated" group is equal to the rate in the "NotInnoculated" group?
+
+As the p-val is less than 0.05 we can reject the null and accept that the vaccine likely reduces paralytic polio cases
+
+### Q2, part 2
+
+(5 points)
+
+On the basis of the calculation in the introduction to question 2, is there strong evidence that vaccination causes a reduction in the probability of paralytic polio among those who do contract polio? Recall that the "NotInnoculated" group is the group that opted out of the vaccine and was not randomly assigned.
+
+there is strong evidence that the vaccination reduces the probability, however that could be caused by potential bias within the group who opted out as it was not a true random sampling.

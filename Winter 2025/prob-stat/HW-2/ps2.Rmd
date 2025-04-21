@@ -1,0 +1,313 @@
+---
+title: "Problem Set 2"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(HistData)
+```
+
+## Introduction
+
+These questions were rendered in R markdown through RStudio
+(<https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf>,
+<http://rmarkdown.rstudio.com> ).
+
+Please generate your solutions in R markdown and upload both a knitted
+doc, docx, or pdf document in addition to the Rmd file.
+
+The questions in this problem set use material from the slides on
+discrete probability spaces and the Rmd
+"Discrete_Probability_Distributions_2_3_3.Rmd".
+
+### Collaboration
+
+(5 points)
+
+Other students consulted on assignment. Please write none if you worked
+by yourself: None
+
+### AI
+
+(5 points)
+
+AI tools used in this assignment. Please write none if you did not use
+any AI tools: JetBrains AI
+
+## Question 1
+
+The study
+
+Kannan S, Bruch JD, Song Z. Changes in Hospital Adverse Events and
+Patient Outcomes Associated With Private Equity Acquisition. JAMA.
+2023;330(24):2365--2375. <doi:10.1001/jama.2023.23147>
+
+found that the rate of hospital-acquired conditions (HACs) at private
+equity hospitals increased from 18.1 per 10,000 eligible
+hospitalizations before acquisition to 22.1 per 10,000 eligible
+hospitalizations after acquisition. The analyses in the study are much
+more detailed than this summary. Consideration was given to the mix of
+patients, the mix of procedures, specific hospital acquired conditions,
+hospital-specific effects, and changes over time. Reading of the article
+is instructive.
+
+This problem set will use those rates to illustrate an application of a
+*binomial probability space* in a much simpler setting than addressed in
+the study.
+
+### Frame Question
+
+In the context of the study above, the null hypothesis is that the rate
+of HACs at private equity hospitals is the same before and after
+acquisition. The alternative hypothesis is that the rate of HACs at
+private equity hospitals changed after acquisition.
+
+For the purposes of the questions on this problem set, we will assume
+outcomes of eligible hospitalizations are independent and the rate of
+HACs depends only on whether the observation was made before or after
+private equity-acquisition. The binary outcome of whether a HAC occurred
+is noted for each eligible hospitalization.
+
+Suppose that there were $n_b=30,000$ eligible hospitalizations before
+acquisition and $n_a=20,000$ eligible hospitalizations after
+acquisition. Let the null hypothesis be that the rate of HACs per 10,000
+eligible hospitalizations is unchanged after private equity acquisition.
+Let the alternative hypothesis be that the rate of HAC at hospitals
+differs pre- and post private equity acquisition. Note this is a *two
+sided* alternative hypothesis. We're allowing for both the possibility
+the the rate increases after acquisition and that it decreases after
+acquisition.
+
+One approach to testing the null hypothesis is to calculate the
+probability of a count of HACs in the after acquisition period as
+extreme as observed or more extreme than observed under the null model
+that the observed cases of HAC were assigned to the before and after
+acquisition periods at random, with a probability of
+$\frac{20,000}{20,000+30,000}$ of being assigned to the after
+acquisition period. Let $c$ be the total number of HACs observed and let
+$a$ be the number of HACs observed after acquisition. We are modeling
+$a$ as a sample from a binomial probability space with size equal to $c$
+and probability of success $\frac{20,000}{20,000+30,000}=0.4$.
+
+### Question 1, part 1
+
+(10 points)
+
+This raises the question of what constitutes a case as extreme as
+observed or more extreme than that observed. One approach is to consider
+the probability of $a$ under the model and add the probabilities of all
+values $k$ for which the density at $k$ is less than or equal to the
+density at $a$. Another approach is to look at the smaller of the two
+tail probabilities: the lower tail probability,the probability of a
+value less than or equal to $a$; and the upper tail probability, the
+probability of a value greater than or equal to $a$. Then use twice the
+smaller of these as the probability of a count as extreme as observed or
+more extreme than observed.
+
+Let's visualize the the options, setting $c=91$ and $a=30$. Note that in
+this example, the probability of $a$ less that or equal to 30 is smaller
+than the probability of $a$ greater than or equal to 30. Thus the tail
+probability approach will use twice the lower tail probability.
+
+```{r}
+c<-91
+a<-30
+
+theoretical.1<-data.frame(value=0:c,f=dbinom(0:c,size=c,prob=0.4))
+theoretical.1$low.probability<-theoretical.1$f<=dbinom(a,size=c,prob=0.4)
+theoretical.1$lower.tail<-theoretical.1$value<=a
+
+
+                            
+g<- ggplot(theoretical.1, aes(x=value, y=f))+geom_line()+
+  geom_point(aes(color=low.probability,shape=lower.tail))+geom_vline(xintercept=a,linetype=2)+geom_hline(yintercept=dbinom(a,size=c,prob=0.4),linetype=2)+
+  annotate('text', x=31, y=0.01, label = "a=30")+
+  labs(
+    title="Versions of Probability of Comparably Extreme Observations",subtitle="Version 1: total low probabilities (blue)\n Version 2: twice the total of lower tail probabilities (triangles)" ,x="Count of HACs after acquisition",y="Probability")
+g
+
+```
+
+A possible approach to calculating the probability p of a value as
+extreme as observed or more extreme than observed is implemented below.
+
+```{r}
+p.get.extreme.1<-function(a,c){
+  p.1<-pbinom(a,c,0.4)
+  p.2<-1-pbinom(a-1,c,0.4)
+  p<-2*min(p.1,p.2)
+  p
+}
+
+```
+
+Another approach is implemented below.
+
+```{r}
+p.get.extreme.2<-function(a,c){
+  ps<-dbinom(0:c,c,0.4)
+  p<-sum(ps[ps<=dbinom(a,c,0.4)])
+  p
+}
+
+```
+
+Does one of these functions implement version 1 on the graph and if so,
+which? Does one of these functions implement version 2 on the graph and
+if so, which?
+
+#### your answer here
+
+yes p.get.extreme.2 is implemented like Version 1 yes p.get.extreme.1 is
+implemented like Version 2 
+
+### Q1, part 2
+
+(10 points)
+
+Type 1 error rate is the probability of rejecting the null hypothesis
+when it is true. This error rate will depend on the threshold used for
+rejection. In this problem, we will reject the null hypothesis if the
+p-value is less than or equal to 0.05.
+
+Consider the model, consistent with the null hypothesis, that the rate
+equals $\frac{18.1+22.1}{2}$ per 10,000 eligible hospitalizations before
+and after acquisition. Below, we simulate 10,000 data sets with $n_a$
+and $n_b$ as above and calculate the probability of a difference as
+large as observed under the assumption that the underlying rate for each
+period equals the combined rate.
+
+```{r}
+n.sim<-100000 # number of simulations
+
+
+n.after<-20000 # number of eligible hospitalizations in after acquisition
+n.before<-30000 # number of eligible hospitalizations in before acquisition
+
+rate.true<-(18.1+22.1)/(2e+4) # the true rate of HACs eligible hospitalizations before and after acquisition, not known to the analyst
+
+# function to simulate data under the null hypothesis and return the two p-values
+case.make.null<-function(n.a,n.b,rate){
+  c<-rbinom(1,n.a+n.b,rate) # generate the total number of HACs
+  a<-rbinom(1,c,n.a/(n.a+n.b)) # assign the number of HACs in the after acquisition period
+  p.1<-p.get.extreme.1(a,c) # calculate the p-value using the first function
+  p.2<-p.get.extreme.2(a,c) # calculate the p-value using the second function
+  return(c(p.1,p.2))
+}
+
+# case.make.null(n.a,n.b,rate.true)
+
+set.seed(4567876) 
+# run the case.make.null function n.sim times and return the results as a matrix with the p-values from the first function in the first column and the p-values from the second function in the second column
+sim.null<-t(replicate(n.sim,case.make.null(n.after,n.before,rate.true)))
+
+type1_rate_func1 <- mean(sim.null[,1] <= 0.05) # proportion of p-values less than 0.05 for the first function
+type1_rate_func1
+
+# your code here: # proportion of p-values less than 0.05 for the second function
+type1_rate_func2 <- mean(sim.null[,2] <= 0.05)
+type1_rate_func2
+
+```
+
+What is the type 1 error rate for the two approaches at the p=0.05
+level?
+
+#### your answer here
+
+p1: 0.04038 p2: 0.04556
+
+## Question 2
+
+Type 2 error rate is the probability of accepting the null hypothesis
+when it is false. This error rate will depend on the threshold used for
+rejection. In this problem, we will reject the null hypothesis if the
+p-value is less than or equal to 0.05.
+
+The type 2 error rate will also depend on the true rates of HAC in the
+two periods.
+
+The function below simulates data using different HAC rates for the
+before and after eligible hospitalizations. It applies rate.a to the
+cases after acquisition and rate.b to the cases before acquisition. The
+function calculates and returns the p-values both ways.
+
+```{r}
+case.make.alt<-function(n.a,n.b,rate.a,rate.b){
+  a<-rbinom(1,n.a,rate.a)
+  b<-rbinom(1,n.b,rate.b)
+  c<-a+b
+  p.1<-p.get.extreme.1(a,c)
+  p.2<-p.get.extreme.2(a,c)
+  return(c(p.1,p.2))
+}
+
+```
+
+This code replicates the simulation 100,000 times.
+
+```{r, cache=TRUE}
+
+#case.make.alt(n.a,n.b,22.1/1e+4,18.1/1e+4)
+set.seed(878343)
+sim.alt<-t(replicate(n.sim,case.make.alt(n.after,n.before,22.1/1e+4,18.1/1e+4)))
+
+```
+
+### Question 2, part 1
+
+(10 points)
+
+What is the type 2 error rate for the two approaches at the p=0.05
+level?
+
+#### your answer here
+```{r}
+type2_error_func1 <- mean(sim.alt[, 1] > 0.05)  # p.values from p.get.extreme.1
+type2_error_func2 <- mean(sim.alt[, 2] > 0.05)  # p.values from p.get.extreme.2
+
+type2_error_func1
+type2_error_func2
+```
+they are 
+p1: 0.85484
+p2: 0.841
+
+### Question 2, part 2
+
+(10 points)
+
+The *power* of of a hypothesis test is the probability of rejecting the
+null hypothesis when it is false. This power will depend on the
+threshold used for rejection, the sample size, and the form of the
+departure from null hypothesis. In this problem, we will reject the null
+hypothesis if the p-value is less than or equal to 0.05. The sample size
+is fixed at $n_a=20,000$ and $n_b=30,000$, and the departure from the
+null hypothesis is that implied by the simulation method in
+`case.make.alt`.
+
+What is the power of the two approaches at the p=0.05 level on these
+data, estimated according to the simulation above? Which method is more
+desirable if the objective is to detect a difference of the type
+simulated here if one exists?
+
+#### your answer here
+```{r}
+power_func1 <- mean(sim.alt[,1] <= 0.05) 
+power_func2 <- mean(sim.alt[,2] <= 0.05)
+
+power_func1
+power_func2
+```
+the second function has a slightly higher probability of rejecting the null hypothesis if it is false

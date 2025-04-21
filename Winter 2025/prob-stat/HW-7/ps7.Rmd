@@ -1,0 +1,303 @@
+---
+title: "Problem Set 7"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(haven)
+library(ggpubr)
+#install.packages("qqplotr")
+library(qqplotr)
+```
+
+## Introduction
+
+These questions were rendered in R markdown through RStudio (<https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf>, <http://rmarkdown.rstudio.com> ).
+
+Please generate your solutions in R markdown and upload both a knitted doc, docx, or pdf document in addition to the Rmd file.
+
+### Collaboration
+
+(5 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself: None
+
+### AI
+
+(5 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools: GPT o3
+
+# Question 1
+
+The y-coordinates of the points in a QQ plot are the *order statistics* of the sample, that is, the observed values sorted in ascending order. The x-coordinates of the points in a QQ plot are quantiles of the theoretical distribution associated with the order statistics. Different formulas for the quantiles of the theoretical distribution are used in different software packages. Likewise, different software packages use different formulas for the confidence band and estimated line for the QQ plot.
+
+## Question 1, part 1
+
+(5 points)
+
+In this part, we will approximate the mean and the 0.025 and 0.975 quantiles of the order statistics of a sample of size $n=20$ from a standard Normal distribution then plot the results on one version of a QQ plot.
+
+Draw 5000 samples of size $n=20$ from a standard Normal distribution. Sort each sample in ascending order. For each of the 20 order statistics, compute the mean and the 0.025 and 0.975 quantiles of the vector of 5000 sampled order statistics.
+
+Create a data frame of the means and quantiles of the order statistics, a vector of $n$ quantiles of the standard Normal distribution, and one of the vectors of sampled order statistics.
+
+```{r}
+n<-20
+set.seed(45678)
+samp<-rnorm((n)*5000)
+samp<-matrix(samp,nrow=5000)
+samp<-t(apply(samp,1,sort))
+
+
+#qs<-qnorm((1:n)/(n+1))
+order.stat.mean<-apply(samp,2,mean)
+order.stat.lower<-apply(samp,2,quantile,probs=.025)
+order.stat.upper<-apply(samp,2,quantile,probs=.975)
+order.stat.lower<-apply(samp,2,quantile,probs=.025)
+
+mu.order.stat<-mean(order.stat.mean)
+sd.order.stat<-sd(order.stat.mean)
+
+qs<-qnorm(((1:n)-.5)/n)
+dat<-data.frame(qs,order.stat.mean,order.stat.lower,order.stat.upper,samp=samp[1,])
+```
+
+Plot the means and quantiles of the order statistics and the quantiles of the standard Normal distribution as a home-made QQ plot, using your own code to add the upper curve corresponding to the 0.95 quantile.
+
+### your answer here
+
+```{r}
+g <- ggplot(dat, aes(x = qs, y = order.stat.mean)) +
+  geom_point(aes(y = order.stat.mean), color = "black") +
+  geom_line(aes(y = order.stat.lower), linetype = "dashed") +
+  geom_line(aes(y = order.stat.upper), linetype = "dashed") +
+  labs(
+    x = "Theoretical Normal Quantiles",
+    y = "Observed Order Statistics (mean, lower & upper lines)",
+    title = "Normal QQ Plot (mean + 0.95 empirical quantile bands)"
+  )
+
+g + geom_abline(
+  intercept = mean(order.stat.mean),
+  slope     = sd(order.stat.mean),
+  linewidth = 0.7
+)
+```
+
+## Question 1, part 2
+
+(5 points)
+
+The function "stat_qq_band" below is a function for plotting the confidence band for a QQ plot. The function "stat_qq_line" below is a function for plotting the estimated line for a QQ plot. The function "stat_qq_point" below is a function for plotting the points in a QQ plot. These functions from the "qqplotr" package are used here to plot the confidence band, estimated line, and points in a QQ plot of the vector "order.stat.mean" of the means of the order statistics.
+
+Does the line with slope equal to the sample standard deviation of "order.stat.mean" and intercept equal to the mean of "order.stat.mean" correspond well to the estimated line in the QQ plot?
+
+### your answer here
+
+Because the data is basically normally distributed it typically match closely, because the formula for a QQ line tries to match the theoretical and empirical quantiles at two points (often the quartiles), or to do a least-squares approach. Both of which are good approximations.
+
+```{r}
+gg<-ggplot(data=dat,aes(sample=order.stat.mean)) + stat_qq_band() + 
+stat_qq_line()+stat_qq_point()
+gg         
+
+
+
+```
+
+## Question 1, part 3
+
+(5 points)
+
+Please plot the quantile lines of the order statistics from Question 1, part 1 on top of the QQ plot from Question 1, part 2. Please comment on the extent to which the quantile lines of the order statistics approximate the boundaries of the confidence band.
+
+### your answer here
+
+It is extremely close throughout, the only place it slightly misses is at the endpoints.
+
+```{r}
+gg + 
+  geom_line(
+    data = dat,
+    aes(x = qnorm(ppoints(n)), y = order.stat.lower),
+    color = "blue",
+    linetype = "dashed"
+  ) +
+  geom_line(
+    data = dat,
+    aes(x = qnorm(ppoints(n)), y = order.stat.upper),
+    color = "blue",
+    linetype = "dashed"
+  ) +
+  labs(title = "QQ plot with overlaid empirical quantile lines")
+ 
+```
+
+## Question 1, part 4
+
+(5 points)
+
+Please use the "qqplotr" package to plot a QQ plot of the vector "samp[1,]", the first row of the matrix of order statistics created above. Please comment on the extent to which these values lie along the QQ line relative to the extent that the means of the order statistics lie along the QQ line.
+
+### your answer here
+
+The single sample of size 20 will show more random scatter around the theoretical Normal line, because it is just one sample. The means of order statistics from 5000 samples (Part 2) show a plot that is much closer to a straight line, because averagingovermanysamples reduces the random fluctuation
+
+```{r}
+ggplot(data=dat,aes(sample=samp)) + stat_qq_band() + 
+  stat_qq_line()+stat_qq_point()
+
+```
+
+## Question 1, part 5
+
+(5 points)
+
+Consider the random variable $X$ on the Gamma distribution with shape parameter "sh", a non-negative number, and the scale parameter "sc", a non-negative number. The code below will plot the density of that gamma distribution. Please find values of "sh" and "sc" such that the QQ plot shows a strong departure from the QQ line. Please show the density of the gamma distribution and the QQ plot on the same page.
+
+### your answer here
+
+```{r}
+sh <- 0.2
+sc <- 1
+
+p1 <- ggplot(data.frame(x = c(0, qgamma(.98, shape = sh, scale = sc))), aes(x = x)) +
+  stat_function(fun = dgamma, args = list(shape = sh, scale = sc)) +
+  labs(
+    title = paste0("Gamma density: shape=", sh, ", scale=", sc),
+    x     = "x",
+    y     = "f(x)"
+  )
+
+set.seed(5678976)
+not.norm <- data.frame(samp = rgamma(20, shape = sh, scale = sc))
+
+p2 <- ggplot(not.norm, aes(sample = samp)) +
+  stat_qq_band() +
+  stat_qq_line() +
+  stat_qq_point() +
+  labs(
+    title = "QQ Plot of a Gamma(0.25, 1) sample vs. Normal",
+    x     = "Theoretical Normal Quantiles",
+    y     = "Sample Quantiles"
+  )
+
+ggpubr::ggarrange(p1, p2, ncol = 2)
+
+```
+
+# Question 2
+
+The following data set is from the NHANES study,Cholesterol - High-Density Lipoprotein (HDL), downloaded from <https://wwwn.cdc.gov/nchs/nhanes/search/datapage.aspx?Component=Laboratory&Cycle=2021-2023>
+
+The variable "LBDHDD" is the HDL cholesterol level in mg/dL.The Shapiro Wilk test is a test of the null hypothesis that the distribution of a sample is Normal. It is implemented in R as "shapiro.test". Please find a value for $n$ below such that p-value of the Shapiro Wilk test of the null hypothesis that the distribution of small sample of "LBDHDD" is Normal is between 0.05 and 0.1. Please show the Shapiro test output and a QQ plot of the small sample.
+
+### your answer here
+
+```{r}
+dat<-read_xpt("HDL_L_23.xpt")
+dat<-filter(dat,!is.na(LBDHDD))
+set.seed(5678)
+dat.sub<-dat[sample(1:nrow(dat),size=4000),]
+ggplot(dat.sub,aes(x=LBDHDD))+geom_histogram(binwidth=1)
+shapiro.test(dat.sub$LBDHDD)
+ggplot(dat.sub,aes(sample=LBDHDD))+stat_qq_band() + 
+  stat_qq_line()+stat_qq_point()
+
+
+set.seed(5678)
+pval_target <- NA
+n_small     <- 15  
+
+for (attempt in 1:1000) {
+  df_try <- dat[sample(1:nrow(dat), size = n_small), ]
+  sw_out <- shapiro.test(df_try$LBDHDD)
+  
+  if (sw_out$p.value > 0.05 & sw_out$p.value < 0.1) {
+    pval_target <- sw_out$p.value
+    cat("Success on attempt:", attempt, 
+        "with sample size =", n_small, 
+        "and Shapiro p-value =", pval_target, "\n")
+    dat.sub <- df_try
+    break
+  }
+}
+
+if (!is.na(pval_target)) {
+  sw_out <- shapiro.test(dat.sub$LBDHDD)
+  print(sw_out)
+
+  ggplot(dat.sub, aes(sample=LBDHDD)) +
+    stat_qq_band() + 
+    stat_qq_line() + 
+    stat_qq_point() +
+    labs(
+      title = paste0("QQ Plot (n=", n_small, ") with Shapiro p-value = ", round(pval_target,4))
+    )
+} else {
+  cat("No sample found in 1000 attempts for n =", n_small, "with p-value in (0.05, 0.1). Try other n.\n")
+}
+
+
+```
+
+## Question 2, part 2
+
+(5 points)
+
+The true mean of the HDL cholesterol level in mg/dL approximately 54.11. Please find the proportion of 5000 samples with replacement of size 1000 for which the 90% Student's t confidence interval for the mean of the HDL cholesterol level in mg/dL includes the true mean. Repeat this for 5000 samples of size 10 with replacement. Please show both proportions. Does the non-Normality of the population distribution affect the proportion of confidence intervals that include the true mean relative to the proportion for the Normal distribution?
+
+### your answer here
+
+It doesn't really effect it, both are within about 0.011 of .9
+
+```{r}
+(mean.hdl<-mean(dat$LBDHDD,na.rm=TRUE))
+in.confint<-function(sz,mu.this,conf.level.this){
+  y<-dat$LBDHDD[sample(1:nrow(dat),size=sz,replace=TRUE)]
+  conf.bounds<-t.test(y,mu=mu.this,conf.level=conf.level.this)$conf.int
+  return(conf.bounds[1]<mu.this &conf.bounds[2]>mu.this)
+  
+}
+
+# 1) For samples of size 1000
+set.seed(5678)
+rep1000 <- 5000
+interval.check.1000 <- replicate(rep1000, in.confint(1000, mean.hdl, 0.90))
+prop_in_1000 <- mean(interval.check.1000)
+
+cat("Proportion of 90% t-intervals capturing the true mean (n=1000) =", prop_in_1000, "\n")
+
+# 2) For samples of size 10
+set.seed(5678)
+rep10 <- 5000
+interval.check.10 <- replicate(rep10, in.confint(10, mean.hdl, 0.90))
+prop_in_10 <- mean(interval.check.10)
+
+cat("Proportion of 90% t-intervals capturing the true mean (n=10) =", prop_in_10, "\n")
+
+```
+
+## Question 2, part 3
+
+(5 points)
+
+The mean HDL cholesterol level in mg/dL for the 2015-2016 NHANES study was approximately 54.4. Please find the p-value of the one-sample t-test of the null hypothesis that the mean HDL cholesterol level in mg/dL for the 2021-2023 NHANES study is equal to the mean HDL cholesterol level in mg/dL for the 2015-2016 NHANES study based on the sub sample of size 4000 created in Question 2, part 1. Please show the output of the t-test.
+
+### your answer here
+
+we would reject H_0 at a 5% significance level and conclude that the true mean is likely different from 54.4
+
+```{r}
+t_out <- t.test(dat.sub$LBDHDD, mu = 54.4, conf.level = 0.95)
+t_out
+```
