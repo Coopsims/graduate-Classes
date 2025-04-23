@@ -1,0 +1,301 @@
+title: "Problem Set 3"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(ggpubr)
+library(boot)
+library(lawstat)
+library(MASS)
+library(tidyverse)
+library(sandwich)
+library(lmtest)
+```
+
+# Introduction
+
+Please complete the following tasks regarding the data in R. Please generate a solution document in R markdown and upload the .Rmd document and a rendered  .doc, .docx, or .pdf document. Please turn in your work on Canvas. Your solution document should have your answers to the questions and should display the requested plots.
+
+### Collaboration
+
+(2 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself:
+
+### AI
+
+(3 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools:
+
+
+# Question 1
+
+A regression model for `ldl` on the remaining variables in `SAheart.data` is fit below. The data are from "Elements of Statistical Learning, ed.2" and are described in https://web.stanford.edu/~hastie/ElemStatLearn/datasets/SAheart.info.txt
+
+```{r}
+dat<-read.csv("./SAheart.data")
+dat$row.names<-NULL
+m.base<-lm(ldl~.,data=dat)
+
+```
+
+## Question 1, part 1
+
+(5 points)
+
+Please produce a visualization and a statistical assessment to address whether the residuals appear to be consistent with a sample from an approximately Normally distributed population. Do the residuals appear to be consistent with a sample from an approximately Normally distributed population?
+
+### your answer here
+
+```{r}
+# Visualize residuals:
+residuals <- residuals(m.base)
+par(mfrow=c(1,2))
+hist(residuals, main="Histogram of Residuals", xlab="Residuals")
+qqnorm(residuals); qqline(residuals, col='red')
+par(mfrow=c(1,1))
+
+# Shapiro-Wilk test for normality
+shapiro_test <- shapiro.test(residuals)
+
+print(shapiro_test)
+# Answer: If the p-value > 0.05, the residuals are consistent with normality. Otherwise, they are not.
+```
+
+
+
+## Question 1, part 2
+
+(5 points)
+
+There are several reasons to transform a variables, that is, to apply a function to the variable then work with the resulting values. We will explore one reason in this question. 
+
+The Box-Cox transformations are a parametrized family of power transformations designed to be applied to the outcome variable to improve the Normality of residuals of a linear model. For $\lambda\neq0$, the transformation maps $y$ to $\frac{y^\lambda-1}{\lambda}$ while for $\lambda=0$, the transformation maps $y$ to $\ln (y)$. (Note that $\ln (y)=\lim_{\lambda \rightarrow0}\frac{y^\lambda-1}{\lambda}$. )
+
+For each value of $\lambda$ in the range of the argument `lambda`, the `boxcox` function in the "MASS" package fits the linear model it is given as an argument but with the Box-Cox transformation applied to the outcome variable, assumed to be positive. The function "boxcox" computes the log likelihood of the residuals under the assumption of Normality. This is plotted against the $\lambda$'s and the $\lambda$'s and the corresponding log likelihoods are returned. In typical use, a value of $\lambda$ close to maximizing the log likelihood is chosen and regression performed with this transformation applied to the outcome variable.
+
+In this problem, you will walk through the steps of conducting a Box-Cox transformation. 
+
+First, graphically identify a range of $\lambda$ close to maximizing the log likelihood. Find the value of $\lambda$ that maximizes the log likelihood.
+
+### your answer here
+
+```{r}
+
+lambda<-boxcox(m.base)
+str(lambda) # x is the lambda value, y is the log likelihood
+
+# at what index is the maximum log likelihood?
+# ll.best<-?
+# what is the corresponding lambda?
+# lambda.best<-?
+
+```
+
+Next it is customary to pick simple $\lambda$ in range rather than exact maximizing value. This is to aid interpretation. Here, the maximixing $\lambda$ is a very small power, and the suggested range includes 0, corresponding to a natural log function. This was the choice made for the example in class.  
+
+
+## Question 1, part 3
+
+(5 points)
+
+Suppose an increase of one unit in the binary `chd` variable is associated with an increase of 0.12 units in `log(ldl)`. Suppose that the predicted value for a case in which `chd` equals 0 is 1.6. If all the other variables are held constant, what is the predicted value of `log(ldl)` for the case in which `chd` equals 1? What are the corresponding values of `ldl` for the two cases?
+
+### your answer here
+
+```{r}
+
+```
+
+
+
+# Question 2
+
+
+The precipitation data in "precip.xlsx" are precipitation values for Boulder, CO from 1894 to March, 2025. The data were copied from precip.xlsx  copied from https://psl.noaa.gov/boulder/Boulder.mm.precip.html April 8, 2025
+
+Precipitation includes rain, snow, and hail. Snow/ice water amounts are either directly measured or a ratio of 1/10 applied for inches of snow to water equivalent. 
+
+The goal is to examine the hypothesis that the monthly precipitation amounts over the most recent decade(s) show consistent annual patterns.
+
+The file loaded below is the data set in long format from problem set 2. The columns are `year`, `period`, and `precip`. The `period` column is a character variable with abbreviations for each month and a level for the total precipitation for the year. The `precip` column is the amount of precipitation in inches.
+
+
+```{r}
+load("precip_formatted.RData")
+sum(is.na(dat))
+
+```
+
+In problem set 2, we considered the hypothesis that annual total precipitation is related to the precipitation in the previous year. Using a lagged model for the years 2016-2024, we found evidence against the null hypothesis that the total precipitation in one year is independent of the total precipitation in the previous year. (The range of years resulted from considering the lag within in the 2015-2024 data set.) However, a more complete set of lags gives a different result.  
+
+```{r}
+# Calculate lagged values for the full data set
+dat.tot<-filter(dat,period=="total")
+dat.tot$lag.precip<-lag(dat.tot$precip)
+
+# function to return the p-value of precipitation based on lagged precipitation for the period from start.year to start.year+time.span-1 inclusive
+lag.p.get<-function(start.year,time.span,dat.this){
+  dat.this<-filter(dat.this,year>=start.year & year<=start.year+time.span)
+  m<-lm(precip~lag.precip,data=dat.this)
+  p<-summary(m)$coefficients[2,4]
+  return(p)
+}
+# the value of the p-value for the lagged model in 2015-2024
+lag.p.get(2015,25,dat.tot)
+# the p-values for start years from 1895 to 1995
+ps<-sapply(seq(1895,2015,by=25), function(x) lag.p.get(x,25,dat.tot))
+mean(ps<0.05)
+
+```
+
+Question 2, part 1
+
+(5 points)
+
+Please repeat the lag analysis for the centered monthly data below. Please use a time span of 25 years and a start year of 1895. Please report the p-value for the lagged model in 2015 and the number of p-values less than 0.05.
+
+```{r}
+dat.monthly<-filter(dat,period!="total")
+dat.monthly<-dat.monthly%>%
+  group_by(period) %>%
+  mutate(precip.mean=mean(precip,na.rm=TRUE))
+dat.monthly<-dat.monthly%>%mutate(precip.centered=precip-precip.mean)
+dat.monthly$precip.lag<-lag(dat.monthly$precip.centered)
+
+## function to get p-value of centered precipitation based on lagged centered 
+
+# lag.p.monthly.get<-function(start.year,time.span,dat.this){
+#   your code here
+# }
+
+
+
+```
+
+
+
+## Question 2, part 2
+
+(10 points)
+
+Please fit and display a multiple regression model of precipitation with the month as a factor and the year as a numeric value for the observations in the years 2001-2025. Please display the model summary and assess the residuals for Normality and homogeneity of variance based on plots or tests, showing the basis for your reasoning.
+
+### your answer here
+
+```{r}
+dat.sub<-filter(dat,year>2000)
+dat.sub<-filter(dat.sub,period!="total")
+# make month a factor, in order from January to December
+dat.sub$period<-factor(dat.sub$period,levels=dat.sub$period[1:12])
+
+```
+
+
+## Question 2, part 3
+
+(5 points)
+
+Please note identify the month and year of the extreme outlier in these data. You might be interested by the results of searching "Boulder flood" on the internet.
+
+### your answer here
+
+```{r}
+
+
+```
+
+## Question 2, part 4
+
+(5 points)
+
+*Sandwich* adjustments to p-values recalculate the covariance matrix for the coefficients using estimates based on the data of the non-constant variances for each observation instead of approximation of a constant error variance based on the error sum of squares, SSE. This is a method used to at least partially address heteroskedasticity in a linear model. The "sandwich" package provides functions to compute the covariance matrix and to adjust the p-values. The function `vcovHC` computes the covariance matrix for a linear model with heteroskedasticity of unknown form. The function `coeftest` computes the adjusted p-values based on the covariance matrix.
+
+Note that the p-values for the sandwich method are also based on the t-distribution with 277 degrees of freedom, the number of observations minus the number of coefficients in the model.
+
+For which months are the p-values for the coefficients of the month factors less than 0.05 for m.trim? For which months are the p-values for the coefficients of the month factors less than 0.05 for the sandwich model based on m.trim? Are these the same months for both models?
+
+### your answer here
+
+```{r}
+# Remove the NA's and an extreme observation.
+dat.trim<-filter(dat.sub,precip<max(precip,na.rm=TRUE))
+m.trim<-lm(precip~.,data=dat.trim)
+(coeffs.base<-summary(m.trim)$coefficients)
+
+attr(coeffs.base,"dimnames")[[1]]
+
+(coeffs.sandwich<-coeftest(m.trim,vcovHC(m.trim,type="HC3")) )# sandwich model
+attr(coeffs.sandwich,"dimnames")[[1]]
+```
+
+## Question 2, part 5
+
+(10 points)
+
+
+This analysis will use tools in the "boot" package. Nonparametric bootstrap analyses are often an option for approximate inference when a data set does not satisfy the hypotheses necessary for the p-value of a statistic to be valid.
+
+There are three steps in a standard bootstrap analysis.
+
+  1. Write a function that takes data and indices as arguments and returns the desired statistics as a function of the data at the values of the indices. 
+  
+  Here, we will write a function that takes the data and indices as arguments and returns the coefficients of a linear model of precip on period and year. 
+
+```{r}
+bootcoeffs<-function(dat.this, indices){
+  d<-dat.this[indices,]
+  m.this<-lm(precip~.,data=d)
+  return(m.this$coefficients)
+}
+# test that the function returns the coefficients of the model in part 4
+ all.equal(bootcoeffs(dat.trim,1:nrow(dat.trim)),m.trim$coefficients)
+```
+
+  2. Draw values of the statistics of interest calculated from bootstrap samples. A non-parametric bootstrap sample is a sample with repetition from the cases in a data set. Here, by specifying the periods as strata, we require that the number of sampled cases from each month must equal the number of cases in that month in the data. The basic idea is that we are drawing another data set, using the empirical distribution as a substitute for the underlying probability space. Then we generate the values of the statistics of interest for multiple bootstrap samples. The `boot` function in the "boot" package does this. The first argument is the data set, the second argument is the function that returns the statistics of interest, and the third argument is the number of bootstrap samples. The `strata` argument specifies that the sampling should be done within each month. 
+  
+Here, drawing these samples can take a minute or two.
+  
+```{r cache=TRUE}
+set.seed(8765)
+N<-10000 # the number of bootstrap samples
+dat.trim$period<-as.factor(dat.trim$period)
+coeff.boot<-boot(dat.trim, bootcoeffs,N,strata = dat.trim$period)
+coeff.boot$t0 # check that t0 is the same as the coefficients from the model in part 4
+```
+  
+  3.  The distribution of the statistics of interest calculated from the bootstrap samples is then used to estimate the sampling distribution of the statistics. Here, we look at bootstrap intervals for the coefficients. They are in the columns of coeff.boot$t. A straightforward option is to look at the quantiles for the generated coefficients. 
+  
+```{r cache=TRUE}
+# 95% CI
+quantile(coeff.boot$t[,3],c(.025,.975)) # feb
+
+boot.quantile.month<-sapply(3:13,function(x) quantile(coeff.boot$t[,x],c(.025,.975))) # a matrix of the quantiles for monthly coefficients in order from february to december
+
+
+
+```
+  
+  
+  The "bca" option is a good general purpose bootstrap interval, worth further study. 
+  
+```{r cache=TRUE}
+boot.ci(coeff.boot,type="bca",conf=.95,index=3)$bca[4:5] # feb
+boot.bca.month<-sapply(3:13,function(x) boot.ci(coeff.boot,type="bca",conf=.95,index=x)$bca[4:5]) # a matrix of the bca intervals for monthly coefficients in order from february to december
+
+
+```
+
+For which months are do the 95% bca intervals for the coefficients of the month factors include 0 for the bootstrap bca method? Please compare this to the months for which the 95% confidence intervals for the coefficients of the month factors include 0 for the sandwich method and for the basic linear regression, m.trim. Are these the same months for both methods? Please justify your answer with output from the model and the bootstrap analysis.
+
+### your answer here
+
+```{r}
+month.name<-levels(dat.trim$period)[2:12]
