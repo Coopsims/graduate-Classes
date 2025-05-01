@@ -1,0 +1,300 @@
+---
+title: "Problem Set 2"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(ggpubr)
+library(boot)
+library(lawstat)
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(car)
+```
+
+# Introduction
+
+Please complete the following tasks regarding the data in R. Please generate a solution document in R markdown and upload the .Rmd document and a rendered .doc, .docx, or .pdf document. Please turn in your work on Canvas. Your solution document should have your answers to the questions and should display the requested plots.
+
+### Collaboration
+
+(2 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself: none
+
+### AI
+
+(3 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools: Junie
+
+# Question 1
+
+(Hypothetical data, based on an experimental scenario using measurements of immunofluorescence) Consider an experiment in which 4 treatments are applied to cell cultures in 6 wells per treatment. Each well has measurements made in different parts of the well. The measurement is reported as an intensity relative to a reference standard. The experience of the experimenters indicate that the characteristics of the cultures in different wells may vary even if the wells have the same treatment.
+
+```{r}
+load("dat_fluor.RData")
+colnames(dat)
+```
+
+## Question 1, part 1
+
+(10 points)
+
+These data give the treatment ID, the well ID within the treatment, and the measurement ID within the well. These should all be used as factors, not numeric values. Given the description above, please perform an ANOVA to test the null hypothesis that the treatment means are equal. Please show the results.
+
+### your answer here
+
+```{r}
+load("dat_fluor.RData")
+fluor <- dat %>%
+  mutate(across(c(treatment, well, meas), as.factor))
+
+mod_q1 <- lmer(meas.val ~ treatment + (1 | treatment:well), data = fluor)
+
+anova(mod_q1)
+
+```
+
+at the 0.05 level we don't reject the null hypothesis that the four treatment means are equal
+
+## Question 1, part 2
+
+(10 points)
+
+Please use the method of estimating variance components to estimate the variance of the treatment effect, the variance of the well effect, and the variance of the measurement error.
+
+### your answer here
+
+```{r}
+model_lmer <- lmer(meas.val ~ 1 + (1|treatment) + (1|treatment:well),
+                   data = dat, REML = TRUE)
+VarCorr(model_lmer)
+```
+
+Wells explain more variation than treatments, so biological/handling differences between wells are the dominant random source of variability
+
+## Question 1, part 3
+
+(5 points)
+
+Given your choice of model, please state the distribution assumptions being made and check them.
+
+### your answer here
+
+```{r}
+shapiro.test(residuals(mod_q1))
+resids <- residuals(model_lmer)
+fitted_vals <- fitted(model_lmer)
+qqnorm(resids); qqline(resids)
+plot(fitted_vals, resids); abline(h=0, lty=2)
+shapiro.test(resids)
+```
+
+Residuals are very close to normal (large p‑value), so the model’s error assumption looks fine
+
+# Question 2
+
+The precipitation data in "precip.xlsx" are precipitation values for Boulder, CO from 1894 to March, 2025. The data were copied from precip.xlsx copied from <https://psl.noaa.gov/boulder/Boulder.mm.precip.html> April 8, 2025
+
+Precipitation includes rain, snow, and hail. Snow/ice water amounts are either directly measured or a ratio of 1/10 applied for inches of snow to water equivalent.
+
+The goal is to examine the hypothesis that the monthly precipitation amounts over the most recent decade show consistent annual patterns.
+
+Unlike in a class setting, in practice, data formatting is often a major component of a data analysis project. Some basic formatting of the data in "precip.txt" is included below for reference.
+
+The symbol "Tr" represents a trace amount of precipitation. Observations marked by a "\*" were made at a non-standard site. Some light-duty data formatting appears below that sets "Tr" values to $0$ and drops years that include an observation made at a non-standard site.
+
+The code provided below reads in the precipitation data. Note most columns are assigned the string class, "chr".
+
+```{r}
+# read in the data from an xlsx file
+dat<-read_xlsx("precip.xlsx",sheet = "Sheet1",range = "A1:N134")
+```
+
+The following replaces all column names with lower case versions. For example, "TOTAL" becomes "total". The command "names(dat)" is used to verify that the replacement has succeeded.
+
+```{r}
+
+# Change all characters in the variable names to lower case.
+names(dat)<-str_to_lower(names(dat))
+names(dat)
+names(dat)[names(dat)=="year total"]<-"total"
+
+
+```
+
+Replace all occurrences of "Tr" with 0. Verify that this was successful.
+
+```{r}
+# Replace "Tr".
+dat<-mutate_all(dat,str_replace,"Tr","0")
+# Count all occurrences of "Tr".
+sum(str_detect(unlist(dat),"Tr"),na.rm=TRUE)
+```
+
+Identify which observations have asterisks. These are non-standard observations. Retain the observations. Remove the asterisks. Be alert to their possible influence on the analysis.
+
+Remove any extra spaces from strings. Convert the columns to numeric values.
+
+```{r}
+dat.exception<-dat%>%mutate(across(names(dat),~str_detect(.x,"\\*")))
+dat<-dat%>%mutate(across(names(dat),~str_replace_all(.x,"\\*","")))
+dat<-dat%>%mutate(across(names(dat),~str_trim(.x)))
+dat<-dat%>%mutate(across(names(dat),~as.numeric(.x)))
+which(is.na(dat), arr.ind=TRUE) # future values
+```
+
+To facilitate the analysis, the data are converted to long format. The "year" column is retained. The other columns are converted to a "period" column. The values in the other columns are converted to a "precip" column.
+
+```{r}
+dat<-pivot_longer(dat,cols = -year,names_to = "period",values_to = "precip")
+
+
+```
+
+Restrict to the years 2015-2025
+
+```{r}
+dat.sub<-filter(dat,year>2014)
+```
+
+## Question 2, part 1
+
+(5 points)
+
+To check that the data are consistent with the assumptions of ANOVA, let's first check whether there strong evidence that the precipitation in one month is linearly related to the precipitation in the previous month after correcting for the monthly means, indicating that the measurements in the months are not independent. These calculations may be useful.
+
+```{r}
+dat.monthly<-filter(dat.sub,period!="total")
+dat.monthly<-dat.monthly%>%
+  group_by(period) %>%
+  mutate(precip.mean=mean(precip,na.rm=TRUE))
+dat.monthly<-dat.monthly%>%mutate(precip.centered=precip-precip.mean)
+dat.monthly$precip.lag<-lag(dat.monthly$precip.centered)
+
+m.monthly<-lm(precip.centered~precip.lag,data=dat.monthly)
+summary(m.monthly)
+plot(m.monthly)
+```
+
+Please perform similar calculations to check whether there is strong evidence that the total precipitation in a year during this period is linearly related to the total precipitation of the previous year.
+
+Is there strong evidence that the precipitation in one month is linearly related to the precipitation in the previous month after correcting for the monthly means.
+
+Is there strong evidence that the total for one year is linearly related to the total for the previous year? (Remember to drop 2025!)
+
+### your answer here
+
+```{r}
+```
+
+```{r}
+dat.annual <- dat.sub %>%
+  filter(period == "total", year < 2025) %>%        # drop partial 2025
+  arrange(year) %>%
+  mutate(total_mean      = mean(precip, na.rm = TRUE),
+         total_centered  = precip - total_mean,
+         total_lag       = lag(total_centered))
+
+m.annual <- lm(total_centered ~ total_lag, data = dat.annual)
+summary(m.annual)
+plot(m.annual)
+```
+
+for monthly there is no evidence against independence
+
+for annual there is evidence against independence and the negative means the years flip flop from wetter to drier.
+
+## Question 2, part 2
+
+(5 points)
+
+Please perform and display a one-way ANOVA on the the 2015-2025 data using the months as factors.
+
+### your answer here
+
+```{r}
+month_levels <- tolower(month.abb)
+
+dat.monthly <- dat.monthly %>% 
+  mutate(period = factor(period,
+                         levels   = month_levels,
+                         ordered  = TRUE))
+
+anova_month <- aov(precip ~ period, data = dat.monthly)
+summary(anova_month)
+
+ggplot(dat.monthly, aes(period, precip)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Monthly precipitation, Boulder CO (2015‑2025)",
+       x = "Month",
+       y = "Precipitation(in)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Question 2, part 3
+
+(5 points)
+
+The output below shows the results of a linear model of precipitation with the month as a factor.
+
+```{r}
+lm_month <- lm(precip ~ period, data = dat.monthly)
+summary(lm_month)      
+
+monthly_means_vs_preds <- dat.monthly %>% 
+  ungroup() %>%                                   # remove existing grouping
+  mutate(pred = predict(lm_month, newdata = .)) %>%
+  group_by(period) %>% 
+  summarise(mean_observed = mean(precip, na.rm = TRUE),
+            mean_pred     = mean(pred,   na.rm = TRUE),
+            .groups = "drop")
+
+print(monthly_means_vs_preds)
+```
+
+### Do you recognize the F statistic and the p-value from earlier calculations?
+
+
+### How do the predicted values for the cases compare to the corresponding monthly means?
+
+Yes, the F-statistic and p-value from this linear model are identical to those from the ANOVA in part 2. This is expected because a one-way ANOVA is mathematically equivalent to a linear model with a single categorical predictor.
+
+
+
+
+## Question 2, part 4
+
+(5 points)
+
+Given the results of part 1 and the output in part 2 of question 2, are the assumptions of ANOVA satisfied? Are the assumptions of the linear model satisfied?
+
+### your answer here
+
+```{r}
+welch_month <- oneway.test(precip ~ period,
+                           data       = dat.monthly,
+                           var.equal  = FALSE)   
+print(welch_month)
+
+leveneTest(precip ~ period, data = dat.monthly)
+
+shapiro.test(residuals(lm_month))
+
+par(mfrow = c(2,2))
+plot(lm_month)
+par(mfrow = c(1,1))
+```
+
+normality looks fine but equal variance is slightly questionable. Residuals are approximately normal given the Shapiro test and the independence checks in Part1 are satisfied, so the Welch inference is valid
+
