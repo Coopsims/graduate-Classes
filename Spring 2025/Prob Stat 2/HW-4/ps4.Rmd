@@ -1,0 +1,243 @@
+---
+title: "Problem Set 4, Spring 2025"
+author: "Ben Funk"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(MASS)
+library(ggpubr)
+library(boot)
+library(lmtest)
+library(sandwich)
+library(lawstat)
+```
+
+# Introduction
+
+Please complete the following tasks regarding the data in R. Please generate a solution document in R markdown and upload the .Rmd document and a rendered  .doc, .docx, or .pdf document. Please turn in your work on Canvas. Your solution document should have your answers to the questions and should display the requested plots.
+
+### Collaboration
+
+(2 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself:
+None
+
+### AI
+
+(3 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools:
+o3
+
+
+All parts below are scored out of 5 points
+
+# Question 1
+
+The following questions use the data "dat_samp.RData" provided with this assignment. These data are from The Census Bureau's American Community Survey (ACS) Public Use Microdata Sample (PUMS) for 2021. They were sampled from a download from IPUMS: Steven Ruggles, Sarah Flood, Ronald Goeken, Megan Schouweiler and Matthew Sobek. IPUMS USA: Version 12.0 [dataset]. Minneapolis, MN: IPUMS, 2022. 
+https://doi.org/10.18128/D010.V12.0
+
+The data are restricted to cases with EMPSTAT equal to 1 and INCWAGE between 1 and 500,000 inclusive. These data are sampled according to PERWT to generate the data set for this exercise. The definitions of the variables are available from https://usa.ipums.org/usa-action/variables/group by searching the variable name, selecting the variable, and selecting "codes".
+
+## Question 1, part 1
+
+Consider the linear model below. Please describe at least one violation of the assumptions of multiple regression and your reasoning for this conclusion. 
+
+```{r}
+load("dat_samp.RData")
+
+m<-lm(INCWAGE~SEX+AGE+MARST+EDUC+PRENT+TRANTIME,data=dat.samp)
+summary(m)
+
+```
+
+### your answer here
+
+```{r}
+par(mfrow = c(1,2))
+plot(m, which = c(1, 2), main = "")
+
+shapiro.test(residuals(m))
+
+res_dat <- data.frame(
+  res   = residuals(m),
+  group = dat.samp$MARST
+)
+levene.test(res_dat$res, res_dat$group, location = "median")
+```
+as we can see above the residuals are not normal and heteroscedasicity is not consistant. backed up by the plots and confirmed with the shapiro and levene test
+
+## Question 1, part 2
+
+Recall Box-Cox transformations are a parametrized family of power transformations designed to be applied to the outcome variable to improve the Normality of residuals of a linear model. For $\lambda\neq0$, the transformation maps $y$ to $\frac{y^\lambda-1}{\lambda}$ while for $\lambda=0$, the transformation maps $y$ to $\ln y$.
+
+For each value of $\lambda$ in the range of the argument "lambda", the "boxcox" function in the "MASS" package fits the linear model it is given as an argument but with the Box-Cox transformation applied to the outcome variable, assumed to be positive. The function "boxcox" computes the log likelihood of the residuals under the assumption of Normality. This is plotted against the $\lambda$'s and the corresponding log likelihoods are returned.
+
+Please identify the value of $\lambda$ that maximizes the log likelihood.
+
+```{r}
+
+lambda<-boxcox(m)
+
+```
+
+### your answer here
+
+```{r}
+lambda_best <- lambda$x[ which.max(lambda$y)]
+lambda_best
+```
+
+## Question 1, part 3
+
+
+Please fit a model with the explanatory variables above, but with INCWAGE transformed by the Box-Cox transformation corresponding to lambda=.33. Please assess the extent to which the fitted model is consistent with the hypotheses of multiple regression, in particular, compared to the untransformed model above.
+
+```{r}
+lambda.near <- 0.33
+
+m_trans <- lm(((INCWAGE^lambda.near - 1) / lambda.near) ~ SEX + AGE + MARST + EDUC + PRENT + TRANTIME,
+              data = dat.samp)
+summary(m_trans)
+par(mfrow = c(1, 2))
+qqnorm(residuals(m), main = "Residuals of Original Model")
+qqline(residuals(m))
+qqnorm(residuals(m_trans), main = "Residuals of Transformed Model")
+qqline(residuals(m_trans))
+```
+
+### your answer here
+this increases the R-Squared from 0.2944 to 0.3338, the Q-Q plot looks a lot better in the transformed model. From this the transformation yields residuals which more closely satisfy the normality and variance requirements while increasing model R-Squared accuracy.
+
+## Question 1, part 4
+
+The data dat10 is a sample of size 100 of respondents meeting the criteria above with EDUC=10.
+
+What is the mean of INCWAGE for dat10? What is the mean of the predicted INCWAGE for dat10 according to the untransformed model, m above? If you apply the inverse of the Box-Cox transformation for lambda=.33 on the predicted INCWAGE for dat10 according to the transformed model, what is the mean of the outcome?
+
+What is the mean of the transformed INCWAGE, ie the mean of $\frac{(INCWAGE)^{\lambda_{near}}-1}{\lambda_{near}}$  for dat10? What is the mean of the predicted transformed INCWAGE value for dat10 according to the transformed model? If you apply the Box-Cox transformation on the predicted INCWAGE for dat10 according to the untransformed model, what is the mean of the outcome?
+
+
+### your answer here
+
+```{r}
+
+load("dat10.RData")
+dat10$MARST <- factor(dat10$MARST)
+dat10$EDUC <- factor(dat10$EDUC)
+
+mean_incwage <- mean(dat10$INCWAGE)
+
+pred_raw  <- predict(m,       newdata = dat10)
+pred_box  <- predict(m_trans, newdata = dat10)
+
+incwage_hat_box <- (pred_box * lambda.near + 1)^(1/lambda.near)
+
+c(obs = mean_incwage,
+  raw_hat  = mean(pred_raw),
+  box_hat  = mean(incwage_hat_box))
+
+mean_bc      <- mean( (dat10$INCWAGE^lambda.near - 1)/lambda.near )
+mean_bc_hat  <- mean(pred_box)
+mean_bc_from_raw <- mean( (pred_raw^lambda.near - 1)/lambda.near )
+
+c(
+  obs_trns          = mean_bc,
+  box      = mean_bc_hat,
+  raw_trns  = mean_bc_from_raw
+)
+
+```
+
+## Question 1, part 5
+
+Which model predicts the mean of INCWAGE better for dat10, the untransformed model or the transformed model? Which model predicts the mean of the transformed INCWAGE better for dat10, the untransformed model or the transformed model?
+
+### your answer here
+
+for the untransformed data, the untransformed model predicts the mean better, for the transformed model the box-cox model was better.
+
+## Question 1, part 6
+
+Please calculate the 95% confidence interval for the coefficient of MARST3 in the transformed model. You may do this using the "confint" function or using the summary information.
+
+### your answer here
+
+```{r}
+confint(m_trans, "MARST3", level = 0.95)
+```
+
+## Question 1, part 7
+
+Please calculate the 95% bca bootstrap interval for the coefficient of MARST3. Please use the "boot" package to compute the bootstrap interval. Please use 1000 bootstrap samples with the seed below. Please comment on the extent to which the two intervals are consistent with each other. Please use unstratified bootstrap samples.
+
+### your answer here
+
+```{r cache=TRUE}
+bootcoeffs <- function(dat, indices) {
+  d <- dat[indices, ]
+  m.boot <- lm(((INCWAGE ^ lambda.near - 1) / lambda.near) ~ SEX + AGE + MARST + EDUC + PRENT + TRANTIME, data = d)
+  return(coef(m.boot)["MARST3"])
+}
+N <- 1000
+set.seed(456789)
+coeff.boot <- boot(dat.samp, bootcoeffs, R = N)
+boot.ci(coeff.boot, type = "bca", index = 1)
+```
+Both intervals lie well below zero and mostly overlap which reinforces that MARST3 has a statistically significant negative effect.
+
+## Question 1, part 8
+
+Please fit the model with the explanatory variables above other than TRANTIME on dat.samp, still with INCWAGE transformed by the Box-Cox transformation corresponding to lambda=.33. Assuming adequate satisfaction of the assumptions of multiple regression, is the larger model above statistically significantly better than the smaller model? Please justify your answer.
+
+### your answer here
+
+```{r}
+m_small <- lm(((INCWAGE^lambda.near - 1) / lambda.near) ~ SEX + AGE + MARST + EDUC + PRENT,
+              data = dat.samp)
+anova_result <- anova(m_small, m_trans)
+anova_result
+p_val <- anova_result$"Pr(>F)"[2]
+```
+since p>0.005 adding trantime doesn't significantly improve model fit.
+
+
+## Question 1, part 9
+
+Please fit the model with the explanatory variables SEX, AGE, MARST, EDUC, and PRENT on dat10, still with INCWAGE transformed by the Box-Cox transformation corresponding to lambda=.33. Note that the leverage of the observations is given by the diagonal of the hat matrix, $H=X(X^TX)^{-1}X^T$, where $X$ is the model matrix. Please compute the leverage of each observation in dat10, note any unusual values, and propose an explanation.(Hint: what is the value of MARST for the observation with the highest leverage?)
+
+```{r}
+m_dat10 <- lm(((INCWAGE^lambda.near - 1) / lambda.near) ~ SEX + AGE + MARST + PRENT,
+              data = dat10)
+leverages <- hatvalues(m_dat10)
+p <- sum(!is.na(coef(m_dat10)))
+avg_hat <- p / nrow(dat10)
+top5_idx <- order(leverages, decreasing = TRUE)[1:5]
+top5_data <- data.frame(Index = top5_idx,
+                        Leverage = leverages[top5_idx],
+                        MARST = dat10$MARST[top5_idx])
+top5_data
+top_index <- top5_idx[1]
+top_leverage <- leverages[top_index]
+top_marst <- dat10$MARST[top_index]
+```
+
+### your answer here
+
+I had to take educ out as there was only one category and the code would throw an error if I didn't, but since there is only EDUC = 10 this will not affect the model.
+
+The significant outlier is observation 94 with a leverage of 1 which means for MARST = 5 that is the only value and as such the fitted value for MARST = 5 is entirely reliant on that one point.
+
+
+
+
+
+
+
+

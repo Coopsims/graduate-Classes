@@ -1,0 +1,267 @@
+---
+title: "Midterm Exercises"
+author: "C. Durso"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggpubr)
+library(lawstat)
+library(GGally)
+library(lmtest)
+options(dplyr.summarise.inform = FALSE)
+```
+
+## Instructions
+
+Please complete the questions on this template and upload your solutions in a single knitted Word or pdf document. Please also upload your completed template.
+
+In light of the exam context, the data sets for the questions have been generated fairly clearly to satisfy or fairly obviously to violate the requirements of the statistical procedures. If reasonable exploratory analysis is done, there should be little ambiguity as to whether the given data satisfy the requirements. This is unrealistic, but less stressful for students and graders alike.
+
+
+## Question 1
+
+The simulated data in the files "dat1_1.RData", "dat1_2.RData", and dat1_3.RData" represent jury awards for four different case types. The dollar value of the awards are in the variable "award". An identifier for the case type is in the variable "case.type". You may assume that the awards in the data are independent samples from the population of possible awards for the given case type. 
+
+The question of interest is whether the mean award for each case type is equal to the mean award for the other case types. One of the data sets satisfies the assumptions for an ANOVA. One of the data sets does not satisfy the assumptions for an ANOVA but fits the requirements for a Kruskal-Wallis test to be a test of the null hypothesis that the means are equal: that the population distributions of the groups differ, if at all, by the addition of a constant. One of the data sets does not meet the assumptions for either an ANOVA or a Kruskal-Wallis test as tests of the null hypothesis that the means are equal. But it does satisfy the assumptions for the Welch's ANOVA test: that each group is an independent sample from a population with a Normal distribution and that the variances of the groups are not necessarily equal.
+
+For each of the three data sets, please perform the following tasks:
+
+
+1. Perform visual or statistical diagnostics to identify the appropriate test for the null hypothesis that the means are equal. State your conclusion.
+
+
+2. Perform and display only the appropriate test for the null hypothesis that the means are equal.
+
+
+3. State your conclusion about the strength of the evidence that the test provides against the null for the specific data set.
+
+
+
+
+
+
+
+
+## Question 1, part 1
+
+(10 points)
+
+Please analyze dat1.1 as described above. For your convenience, basic syntax for each of the tests is illustrated below. Please delete the inapplicable tests.
+
+
+```{r}
+load(file="dat1_1.RData")
+kruskal.test(dat1.1$award,dat1.1$case.type) # stats package
+oneway.test(award~case.type,data=dat1.1)
+summary(aov(award~case.type,data=dat1.1) )
+```
+
+### your answer here
+
+## Question 1, part 2
+
+(10 points)
+
+
+Please analyze dat1.2 as described above.
+
+### your answer here
+
+```{r}
+load(file="dat1_2.RData")
+
+```
+
+## Q1, part 3
+
+(10 points)
+
+
+Please analyze dat1.3 as described above. 
+
+### your answer here
+
+```{r}
+load(file="dat1_3.RData")
+
+```
+
+# Question 2
+
+The simulated data in the file "dat2.RData" represent the results of a drug trial. Subjects with one of 3 disease etiologies, "disease", were recruited, then randomly assigned to one of 4 treatments, "treatment", and the amount of a biomarker assessed, "amt".
+
+
+
+## Question 2, part 1
+
+(5 points)
+
+Please perform visual or statistical diagnostics to test the applicability of a 2-way ANOVA with interaction to these data. State your conclusion.
+
+### your answer here
+
+```{r}
+load("dat2.RData")
+
+```
+
+## Question 2, part 2
+
+(10 points)
+
+Please perform a 2-factor ANOVA with interaction using "amt" as the response variable and "disease" and "treatment" as the grouping variables. Please provide an interpretation of the results, taking into account your response to part 1. Please also provide a visualization of the results in the form of a profile plot.
+
+### your answer here
+
+```{r}
+
+```
+
+## Question 3
+
+
+
+(10 points)
+
+A biology team has clutches of 30 eggs from each of 5 different fish of the same species. Different clutches may have different growth rates. The team is interested in the effect of the light level (light1, light2, and light3) and the diet (diet1 and diet2) on the growth of the newly hatched fish. Each clutch is divided into 3 groups of 10 eggs. Each group is assigned to an aquarium at one of the 3 light levels. Each aquarium has a divider that separates the fish in the aquarium into 2 groups of 5 fish. Each group is assigned to one of the 2 diets. The team is interested in whether the mean growth of the fish is affected by the light level, diet, or their interaction.
+Please perform an ANOVA to assess whether the data are consistent with the null hypothesis that the light level and diet are unrelated to the mean growth of the fish. Please use an error structure suited to the experimental design. What do you conclude? What is the significance level of your test?
+
+## your answer here
+
+```{r}
+load("dat3.RData")
+```
+
+
+
+# Question 4
+
+A researcher has identified 3 scale variables, x1, x2, and x3, for a particular population that may predict whether the delivery of an infant is by cesarean section or not, an outcome variable "caesearean" that is coded as 1 for a cesarean delivery and 0 otherwise. 
+
+
+
+## Question 4, part 1
+
+(5 points)
+
+Please fit a logistic regression model to the simulated data in the file "dat4.RData" using "caesarean" as the response variable and the 3 scale variables as the explanatory variables. Please display the summary of the model. 
+
+### your answer here
+
+```{r}
+load("dat4.RData")
+
+```
+
+
+## Question 4, part 2
+
+(5 points)
+
+Suppose the probability of a caesarean delivery is 0.5 for a particular case. For another case with the same values of the x2 and x3, but with x1 increased by 0.2, what is the probability of a caesarean delivery in this second case? Please explain your answer.
+
+### your answer here
+
+```{r}
+
+```
+
+
+# Question 5
+
+The data sets "dat5.train" and "dat5.test" have 5 numeric explanatory variables, x1, x2, through x5, and a numeric outcome variable, y.
+
+
+## Question 5, part 1
+
+(10 points)
+
+Please fit a regression model of y on x1 through x5 and their pairwise interactions, m.big. Please display the summary and the usual diagnostic plots. Do the diagnostic plots indicate that the assumptions of a linear model are satisfied?
+
+### your answer here
+
+```{r}
+load("dat5_train.RData")
+
+# m.big<-lm(your code here)
+
+```
+
+
+
+
+## Question 5, part 2
+
+(5 points)
+
+Please fit a forward selection model based on AIC with m.big as the maximal model and the intercept-only model as the minimal model. While developing the model, you may want to look at the full output, but please set "trace=FALSE" when knitting your midterm. Display the summary and the usual diagnostic plots. Do the diagnostic plots indicate that the assumptions for this linear model are satisfied? 
+
+### your answer here
+
+```{r}
+
+```
+
+## Question 5, part 3
+
+(5 points)
+
+Please fit a backward selection model based on AIC with m.big as the maximal model and the intercept-only model as the minimal model. While developing the model, you may want to look at the full output, but please set "trace=FALSE" when knitting your midterm. Display the summary and the usual diagnostic plots. Do the diagnostic plots indicate that the hypotheses assumptions this linear model are satisfied?
+
+### your answer here
+
+```{r}
+
+```
+
+## Question 5, part 4
+
+(5 points)
+
+Still using x1 through x5 and their pairwise interactions, please identify the best subsets of variables for models with these explanatory variables. You don't need to print out all the models. Please display the best subset model for the number of variables that results in the lowest BIC among these models. Do the diagnostic plots indicate that the hypotheses of the linear model for y based on iid Normal errors are satisfied?
+
+### your answer here
+
+```{r}
+library(leaps)
+
+
+# X<-model.matrix(m.big)
+# attr(X,"dimnames")[[2]]
+
+
+```
+
+## Question 5, part 5
+
+(5 points)
+
+Is the model using all the variables and their pairwise interactions a statistically significant improvement on the forward model?
+
+Is the model using all the variables, pairwise interactions and squares a statistically significant improvement on the best subset model for the number of variables that results in the lowest BIC among these models?
+
+### your answer here
+
+```{r}
+
+```
+
+## Question 5, part 6
+
+(5 points)
+
+Please examine the mean square errors on the test data for the forward model, the best subset model, the backward model and the model using all the variables and their pairwise interactions. On the basis of the mean square errors, which model would you select?
+
+### your answer here
+
+```{r}
+load("dat5_test.RData")
+
+```
+

@@ -1,6 +1,6 @@
 ---
 title: "Problem Set 4, Spring 2025"
-author: "your name here"
+author: "Ben Funk"
 output:
   word_document: default
   pdf_document: default
@@ -12,7 +12,7 @@ library(tidyverse)
 library(MASS)
 library(ggpubr)
 library(boot)
-
+library(lawstat)
 
 ```
 
@@ -57,6 +57,20 @@ summary(m)
 
 ### your answer here
 
+```{r}
+par(mfrow = c(1,2))
+plot(m, which = c(1, 2), main = "")
+
+shapiro.test(residuals(m))
+
+res_dat <- data.frame(
+  res   = residuals(m),
+  group = dat.samp$MARST
+)
+levene.test(res_dat$res, res_dat$group, location = "median")
+```
+
+
 ## Question 1, part 2
 
 Recall Box-Cox transformations are a parametrized family of power transformations designed to be applied to the outcome variable to improve the Normality of residuals of a linear model. For $\lambda\neq0$, the transformation maps $y$ to $\frac{y^\lambda-1}{\lambda}$ while for $\lambda=0$, the transformation maps $y$ to $\ln y$.
@@ -74,7 +88,8 @@ lambda<-boxcox(m)
 ### your answer here
 
 ```{r}
-
+lambda_best <- lambda$x[ which.max(lambda$y) ]
+lambda_best
 
 ```
 
@@ -86,7 +101,20 @@ Please fit a model with the explanatory variables above, but with INCWAGE transf
 ```{r}
 lambda.near<-.33
 
+m.trans <- lm(((INCWAGE ^ lambda.near - 1) / lambda.near) ~ SEX + AGE + MARST + EDUC + PRENT + TRANTIME,
+              data = dat.samp)
 
+
+par(mfrow = c(1,2))
+plot(m.trans, which = c(1, 2), main = "")
+
+shapiro.test(residuals(m.trans))
+
+res_dat <- data.frame(
+  res   = residuals(m.trans),
+  group = dat.samp$MARST
+)
+levene.test(res_dat$res, res_dat$group, location = "median")
 ```
 
 ### your answer here
@@ -106,7 +134,20 @@ What is the mean of the transformed INCWAGE, ie the mean of $\frac{(INCWAGE)^{\l
 load("dat10.RData")
 dat10$MARST<-factor(dat10$MARST)
 dat10$EDUC<-factor(dat10$EDUC)
+mean_incwage <- mean(dat10$INCWAGE)
 
+pred_raw  <- predict(m,       newdata = dat10)
+pred_box  <- predict(m.trans, newdata = dat10)
+
+incwage_hat_box <- (pred_box * lambda.near + 1)^(1/lambda.near)
+
+c(obs = mean_incwage,
+  raw_hat  = mean(pred_raw),
+  box_hat  = mean(incwage_hat_box))
+
+mean_bc      <- mean( (dat10$INCWAGE^lambda.near - 1)/lambda.near )
+mean_bc_hat  <- mean(pred_box)
+mean_bc_from_raw <- mean( (pred_raw^lambda.near - 1)/lambda.near )
 
 ```
 
@@ -118,6 +159,12 @@ Which model predicts the mean of INCWAGE better for dat10, the untransformed mod
 
 ### your answer here
 
+```{r}
+abs(mean_incwage - mean(pred_raw))        # raw error
+abs(mean_incwage - mean(incwage_hat_box)) # BC error
+```
+
+
 ## Question 1, part 6
 
 Please calculate the 95% confidence interval for the coefficient of MARST3 in the transformed model. You may do this using the "confint" function or using the summary information.
@@ -125,7 +172,7 @@ Please calculate the 95% confidence interval for the coefficient of MARST3 in th
 ### your answer here
 
 ```{r}
-
+confint(m.trans, "MARST3", level = 0.95)
 ```
 
 ## Question 1, part 7
@@ -135,15 +182,30 @@ Please calculate the 95% bca bootstrap interval for the coefficient of MARST3. P
 ### your answer here
 
 ```{r cache=TRUE}
-# bootcoeffs<-function(dat.this, indices){
-#   your code here
-# }
-# N=1000
-# set.seed(456789)
-# coeff.boot<-boot(dat.samp, bootcoeffs,N)
-# 
-# 
-# (boot.95<-boot.ci(coeff.boot, type="bca", index=???))
+bootcoeffs <- function(dat, idx){
+  m_ <- try(
+    lm(((INCWAGE^lambda.near - 1)/lambda.near) ~
+         SEX + AGE + MARST + EDUC + PRENT + TRANTIME,
+       data = dat[idx, ]),
+    silent = TRUE
+  )
+  if(inherits(m_, "try-error") ||
+      is.na(coef(m_)[["MARST3"]])) return(NA_real_)
+  coef(m_)[["MARST3"]]
+}
+
+set.seed(4567869)
+coeff.boot <- boot(dat.samp, bootcoeffs, R = 1000, parallel = "no")
+
+good           <- !is.na(coeff.boot$t)   # logical vector marking valid rows
+coeff.boot$t   <- coeff.boot$t[good, , drop = FALSE]  # keep as matrix
+coeff.boot$R   <- sum(good)              # update replicate count
+
+ci_bca <- boot.ci(coeff.boot, type = "bca", index = 1)
+ci_bca
+```
+```{r}
+
 ```
 
 
@@ -154,7 +216,12 @@ Please fit the model with the explanatory variables above other than TRANTIME on
 ### your answer here
 
 ```{r}
+m_large_bc <- m.trans
+m_small_bc <- lm(((INCWAGE^lambda.near - 1)/lambda.near) ~
+                 SEX+AGE+MARST+EDUC+PRENT,
+                 data = dat.samp)
 
+anova(m_small_bc, m_large_bc)
 ```
 
 ## Question 1, part 9
@@ -162,7 +229,13 @@ Please fit the model with the explanatory variables above other than TRANTIME on
 Please fit the model with the explanatory variables SEX, AGE, MARST, EDUC, and PRENT on dat10, still with INCWAGE transformed by the Box-Cox transformation corresponding to lambda=.33. Note that the leverage of the observations is given by the diagonal of the hat matrix, $H=X(X^TX)^{-1}X^T$, where $X$ is the model matrix. Please compute the leverage of each observation in dat10, note any unusual values, and propose an explanation.(Hint: what is the value of MARST for the observation with the highest leverage?)
 
 ```{r}
+m_dat10 <- lm(((INCWAGE^lambda.near - 1)/lambda.near) ~
+              SEX+AGE+MARST+EDUC+PRENT,
+              data = dat10)
 
+lev <- hatvalues(m_dat10)
+dat10$leverage <- lev
+print( lev[ order(-lev) ][1:5 ] )
 
 ```
 
