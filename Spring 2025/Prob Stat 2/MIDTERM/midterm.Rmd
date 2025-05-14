@@ -1,6 +1,6 @@
 ---
 title: "Midterm Exercises"
-author: "C. Durso"
+author: "Ben Funk"
 output:
   word_document: default
   html_document: default
@@ -43,6 +43,36 @@ For each of the three data sets, please perform the following tasks:
 
 
 
+### Helper function I created, this will automatically select the best test given the results of the levene and shapiro-wilks test
+```{r}
+diagnose_and_test <- function(df, response, group) {
+  response_vec <- df[[response]]
+  group_vec    <- df[[group]]
+
+  # Normality per group
+  shapiro_list <- by(response_vec, group_vec, shapiro.test)
+  normal_ok    <- all(sapply(shapiro_list, \(x) x$p.value > .05))
+
+  # Homogeneity of variances
+  levene_p     <- lawstat::levene.test(response_vec, group_vec)$p.value
+  equal_var    <- levene_p > .05
+
+  # Select appropriate test
+  if (normal_ok) {
+    if (equal_var) {
+      out <- aov(response_vec ~ group_vec)
+    } else {
+      out <- oneway.test(response_vec ~ group_vec)
+    }
+  } else {
+    out <- kruskal.test(response_vec, group_vec)
+  }
+
+  list(Shapiro = shapiro_list,
+       LeveneP = levene_p,
+       Test    = out)
+}
+```
 
 
 
@@ -64,6 +94,12 @@ summary(aov(award~case.type,data=dat1.1) )
 
 ### your answer here
 
+```{r}
+q1p1 <- diagnose_and_test(dat1.1, "award", "case.type")
+q1p1
+```
+The null hypothesis that the four case-type means are equal is rejected; at least one mean award differs.
+
 ## Question 1, part 2
 
 (10 points)
@@ -74,9 +110,13 @@ Please analyze dat1.2 as described above.
 ### your answer here
 
 ```{r}
-load(file="dat1_2.RData")
+load("dat1_2.RData")
+q1p2 <- diagnose_and_test(dat1.2, "award", "case.type")
+q1p2
 
 ```
+There is no evidence that the mean award differs by case type; retain the null.
+
 
 ## Q1, part 3
 
@@ -88,9 +128,13 @@ Please analyze dat1.3 as described above.
 ### your answer here
 
 ```{r}
-load(file="dat1_3.RData")
+load("dat1_3.RData")
+q1p3 <- diagnose_and_test(dat1.3, "award", "case.type")
+q1p3
 
 ```
+The null of equal central tendency is rejected; median/mean awards are not equal across the four case types.
+
 
 # Question 2
 
@@ -108,8 +152,22 @@ Please perform visual or statistical diagnostics to test the applicability of a 
 
 ```{r}
 load("dat2.RData")
+mod_q2 <- aov(amt ~ disease * treatment, data = dat2)
+summary(mod_q2)
+par(mfrow = c(2, 2))
+plot(mod_q2)                             
+par(mfrow = c(1, 1))
+
+shapiro.test(residuals(mod_q2))
+
+lev_p <- lawstat::levene.test(dat2$amt,
+                              interaction(dat2$disease, dat2$treatment))$p.value
+lev_p
+
 
 ```
+Since both diagnostic p-values exceed 0.05 and the residual plots look good, the two‑factor ANOVA with interaction fitted in mod_q2 satisfies the key assumptions, meaning a two-factor ANOVA with interaction is appropriate.
+
 
 ## Question 2, part 2
 
@@ -120,8 +178,13 @@ Please perform a 2-factor ANOVA with interaction using "amt" as the response var
 ### your answer here
 
 ```{r}
-
+ggplot(dat2, aes(treatment, amt, colour = disease, group = disease)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun = mean, geom = "point") +
+  theme_minimal()
 ```
+Both main effects are significant and, importantly, the significant interaction (p = 0.009) shows that the size and direction of the treatment effect depends on disease etiology. When interpreting treatment differences, you must compare treatments within each disease group.
+
 
 ## Question 3
 
@@ -136,7 +199,10 @@ Please perform an ANOVA to assess whether the data are consistent with the null 
 
 ```{r}
 load("dat3.RData")
+mod_q3 <- aov(weight ~ light * diet+ Error(clutch/light), data = dat3)
+summary(mod_q3)
 ```
+Only diet significantly alters fish growth (p = 0.035), with the same direction and magnitude regardless of light intensity. Light intensity alone and its interaction with diet have no measurable effect. Thus, management should focus on dietary formulation rather than lighting to enhance growth under the conditions tested.
 
 
 
@@ -156,7 +222,8 @@ Please fit a logistic regression model to the simulated data in the file "dat4.R
 
 ```{r}
 load("dat4.RData")
-
+mod_q4 <- glm(caesarean ~ x1 + x2 + x3, data = dat4, family = binomial)
+summary(mod_q4)
 ```
 
 
@@ -169,9 +236,14 @@ Suppose the probability of a caesarean delivery is 0.5 for a particular case. Fo
 ### your answer here
 
 ```{r}
-
+p0     <- 0.5
+logit0 <- log(p0 / (1 - p0))
+beta1  <- coef(mod_q4)["x1"]
+logit1 <- logit0 + 0.2 * beta1
+p1     <- exp(logit1) / (1 + exp(logit1))
+p1
 ```
-
+Raising x1 by 0.2  moves the log-odds by 0.2 × (–1.2292)=–0.246. The baseline probability of 0.5 falls to 0.44
 
 # Question 5
 
@@ -188,11 +260,13 @@ Please fit a regression model of y on x1 through x5 and their pairwise interacti
 
 ```{r}
 load("dat5_train.RData")
+train_df <- dat5.train
 
-# m.big<-lm(your code here)
-
+m.big <- lm(y ~ (x1 + x2 + x3 + x4 + x5)^2, data = train_df)
+summary(m.big)
+par(mfrow = c(2, 2)); plot(m.big)
 ```
-
+Assumptions are largely OK given the plot of the residuals. The Model explains ~35 % of variance which is not fantastic.
 
 
 
@@ -205,8 +279,16 @@ Please fit a forward selection model based on AIC with m.big as the maximal mode
 ### your answer here
 
 ```{r}
-
+m.null <- lm(y ~ 1, data = train_df)
+m.fwd  <- step(m.null,
+               scope = list(lower = formula(m.null),
+                            upper  = formula(m.big)),
+               direction = "forward",
+               trace = FALSE)
+summary(m.fwd)
+par(mfrow = c(2, 2)); plot(m.fwd)
 ```
+Forward selection retained only the intercept because no term reduced AIC below 23.7. The forward AIC adds no predictive value beyond the mean.The residuals are just lines except for the QQ which is approx norm.
 
 ## Question 5, part 3
 
@@ -217,8 +299,12 @@ Please fit a backward selection model based on AIC with m.big as the maximal mod
 ### your answer here
 
 ```{r}
-
+m.back <- step(m.big, direction = "backward", trace = FALSE)
+summary(m.back)
+par(mfrow = c(2, 2)); plot(m.back)
 ```
+Slightly simpler than full model with comparable fit, no serious violations found in the residuals
+
 
 ## Question 5, part 4
 
@@ -230,13 +316,20 @@ Still using x1 through x5 and their pairwise interactions, please identify the b
 
 ```{r}
 library(leaps)
-
-
-# X<-model.matrix(m.big)
-# attr(X,"dimnames")[[2]]
-
-
+Xmat       <- model.matrix(m.big)[, -1]
+best_sub   <- regsubsets(Xmat, train_df$y,
+                         nbest = 1, nvmax = ncol(Xmat), method = "exhaustive")
+best_info  <- summary(best_sub)
+best_size  <- which.min(best_info$bic)
+best_coef  <- coef(best_sub, best_size)
+best_vars  <- names(best_coef)[-1]
+form_best  <- as.formula(paste("y ~", paste(best_vars, collapse = " + ")))
+m.bic      <- lm(form_best, data = train_df)
+summary(m.bic)
+par(mfrow = c(2, 2)); plot(m.bic)
 ```
+Most parsimonious of the competitive models was found, residuals all look fine 
+
 
 ## Question 5, part 5
 
@@ -249,8 +342,15 @@ Is the model using all the variables, pairwise interactions and squares a statis
 ### your answer here
 
 ```{r}
+anova(m.fwd, m.big)
 
+anova(m.bic, m.big)
 ```
+
+
+Full vs Forward: The full model is a highly significant improvement.
+
+Full vs Best-subset: an F-test (df = 11, 84) produces p > 0.05, meaning the extra terms in m.big do not meaningfully improve fit relative to the BIC model.
 
 ## Question 5, part 6
 
@@ -263,5 +363,19 @@ Please examine the mean square errors on the test data for the forward model, th
 ```{r}
 load("dat5_test.RData")
 
-```
+test_df <- dat5.test
 
+mse <- function(actual, pred) mean((actual - pred)^2)
+
+mse_results <- tibble(
+  model = c("big", "forward", "backward", "bic"),
+  mse   = c(
+    mse(test_df$y, predict(m.big,  newdata = test_df)),
+    mse(test_df$y, predict(m.fwd,  newdata = test_df)),
+    mse(test_df$y, predict(m.back, newdata = test_df)),
+    mse(test_df$y, predict(m.bic,  newdata = test_df))
+  )
+)
+mse_results
+```
+The best-subset BIC model achieves the lowest prediction error and is also the most concise, so it would be the recommended model for future use.
