@@ -1,0 +1,330 @@
+---
+title: "Problem Set 6"
+author: "Ben Funk"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(GGally)
+library(ggpubr)
+library(lmtest)
+library(MASS)
+library(ResourceSelection)
+library(DescTools)
+options(dplyr.summarise.inform = FALSE)
+library(survey)
+
+```
+
+## Introduction
+
+Please complete the following tasks regarding the data in R. Please generate a solution document in R markdown and upload the .Rmd document and a rendered  .doc, .docx, or .pdf document. Please turn in your work on Canvas. Your solution document should have your answers to the questions and should display the requested plots. Also, please upload the .RData file you generate. 
+
+### Collaboration
+
+(2 points)
+
+Other students consulted on assignment. Please write none if you worked by yourself:
+None
+
+### AI
+
+(3 points)
+
+AI tools used in this assignment. Please write none if you did not use any AI tools:
+o3
+
+
+# Question 1
+
+The raw data in this question is the “Pew Research Center’s American Trends Panel” 
+Wave 142 American Trends Panel 
+Dates: Feb. 7 - Feb. 11, 2024
+
+data and questionnaire and code book downloaded 5/7/2025 from https://www.pewresearch.org/dataset/american-trends-panel-wave-142/
+
+
+The data sets "dat.cr.train", "dat.cr.valid", and "dat.cr.test" are a partition of the responses from form 2, omitting responses of 99, to AICOPYRGHT_d_W142.  All responses have been converted to factors. Only factors with 2 or more levels and less than 15 levels are included. The outcome variable "cr" is a binary variable created from AICOPYRGHT_d_W142 by setting the response 1 to "1" and all other responses to "0".
+
+
+## Question 1, part 1
+
+(5 points)
+
+Fit a logistic model by forward selection using AIC on "dat.cr.train". Model the binary outcome "cr", selecting from all the survey responses excluding "AICOPYRGHT_d_W142". Please display the fitted model.
+
+### your answer here
+
+```{r cache=TRUE}
+# --- Question 1, part 1 ---
+load("dat_cr_train.RData")
+
+# convert binary outcome to integer
+dat.cr.train <- dat.cr.train %>%
+  mutate(cr = as.integer(as.character(cr)))
+
+big.nam <- setdiff(names(dat.cr.train),
+                   c("cr", "AICOPYRGHT_d_W142"))
+
+m0 <- glm(cr ~ 1, data = dat.cr.train, family = "binomial")
+scope.form <- as.formula(paste("~", paste(big.nam, collapse = " + ")))
+
+m.forward.big <- step(
+  m0,
+  scope  = list(lower = ~1, upper = scope.form),
+  direction = "forward",
+  trace  = 0
+)
+
+summary(m.forward.big)
+hoslem.test(dat.cr.train$cr == 1, fitted(m.forward.big), g = 10)
+
+```
+
+## Question 1, part 2
+
+(5 points)
+
+Please compute and display the confusion matrix, the accuracy, the precision, and F1 on the training data "dat.cr.train", the mean deviance (the deviance divided by the number of cases), and the McFadden Pseudo $R^2$ for this model. 
+
+### your answer here
+
+```{r}
+# --- Question 1, part 2 ---
+actual_train <- dat.cr.train$cr
+pred_train   <- ifelse(fitted(m.forward.big) >= .5, 1, 0)
+
+cm_train <- table(Predicted = pred_train, Actual = actual_train)
+cm_train
+
+accuracy_train  <- sum(diag(cm_train)) / sum(cm_train)
+precision_train <- cm_train["1","1"] / sum(cm_train["1", ])
+recall_train    <- cm_train["1","1"] / sum(cm_train[ , "1"])
+f1_train        <- 2 * precision_train * recall_train / (precision_train + recall_train)
+mean_dev_train  <- m.forward.big$deviance / nrow(dat.cr.train)
+mcFadden        <- PseudoR2(m.forward.big, "McFadden")
+
+list(accuracy  = accuracy_train,
+     precision = precision_train,
+     recall    = recall_train,
+     f1        = f1_train,
+     meanDev   = mean_dev_train,
+     McFadden  = mcFadden)
+
+```
+
+## Question 1, part 3
+
+(5 points)
+
+Please compute and display the confusion matrix, the accuracy, the precision, F1, and the mean deviance when the model above is used to predict the validation data, "dat.cr.valid". Please be sure that the knitted version shows labels for the answers.
+
+### your answer here
+
+```{r}
+# --- Question 1, part 3 ---
+load("dat_cr_valid.RData")
+
+dat.cr.valid <- dat.cr.valid %>%
+  mutate(cr = as.integer(as.character(cr)))
+
+prob_valid <- predict(m.forward.big, newdata = dat.cr.valid, type = "response")
+pred_valid <- ifelse(prob_valid >= .5, 1, 0)
+actual_valid <- dat.cr.valid$cr
+
+cm_valid <- table(Predicted = pred_valid, Actual = actual_valid)
+cm_valid
+
+accuracy_valid  <- sum(diag(cm_valid)) / sum(cm_valid)
+precision_valid <- cm_valid["1","1"] / sum(cm_valid["1", ])
+recall_valid    <- cm_valid["1","1"] / sum(cm_valid[ , "1"])
+f1_valid        <- 2 * precision_valid * recall_valid / (precision_valid + recall_valid)
+mean_dev_valid  <- -2 * mean(actual_valid * log(prob_valid) +
+                             (1 - actual_valid) * log(1 - prob_valid))
+
+list(accuracy  = accuracy_valid,
+     precision = precision_valid,
+     recall    = recall_valid,
+     f1        = f1_valid,
+     meanDev   = mean_dev_valid)
+
+```
+
+
+## Question 1, part 4
+
+(10 points)
+
+Please repeat the steps above for a smaller set of available predictors, excluding all the copyright questions, those with names beginning with "AICOPYRGHT"
+
+### your answer here
+
+```{r}
+# --- Question 1, part 4 ---
+cpyright.nam <- names(dat.cr.train)[str_detect(names(dat.cr.train), "AICOPYRGHT")]
+nam.without  <- setdiff(names(dat.cr.train), c("cr", cpyright.nam))
+
+m0_wo <- glm(cr ~ 1, data = dat.cr.train, family = "binomial")
+scope.wo <- as.formula(paste("~", paste(nam.without, collapse = " + ")))
+
+m.forward.without <- step(
+  m0_wo,
+  scope  = list(lower = ~1, upper = scope.wo),
+  direction = "forward",
+  trace  = 0
+)
+
+summary(m.forward.without)
+hoslem.test(dat.cr.train$cr == 1, fitted(m.forward.without), g = 10)
+
+prob_valid_wo <- predict(m.forward.without, newdata = dat.cr.valid, type = "response")
+pred_valid_wo <- ifelse(prob_valid_wo >= .5, 1, 0)
+
+cm_valid_wo <- table(Predicted = pred_valid_wo, Actual = actual_valid)
+cm_valid_wo
+
+accuracy_valid_wo  <- sum(diag(cm_valid_wo)) / sum(cm_valid_wo)
+precision_valid_wo <- cm_valid_wo["1","1"] / sum(cm_valid_wo["1", ])
+recall_valid_wo    <- cm_valid_wo["1","1"] / sum(cm_valid_wo[ , "1"])
+f1_valid_wo        <- 2 * precision_valid_wo * recall_valid_wo /
+                      (precision_valid_wo + recall_valid_wo)
+mean_dev_valid_wo  <- -2 * mean(actual_valid * log(prob_valid_wo) +
+                                (1 - actual_valid) * log(1 - prob_valid_wo))
+
+list(accuracy  = accuracy_valid_wo,
+     precision = precision_valid_wo,
+     recall    = recall_valid_wo,
+     f1        = f1_valid_wo,
+     meanDev   = mean_dev_valid_wo)
+
+```
+
+## Question 1, part 5
+
+(5 points)
+
+On the basis of the accuracy, precision, recall, and F1 on the validation data, which model do you prefer?
+
+### your answer here
+
+
+## Question 1, part 6
+
+(5 points)
+
+Please fit the forward model by AIC for set of predictors in Question 1, party 4, on the training data combined with the validation data. Is there evidence that the smaller data set has biased the forward fit toward a simpler model?
+
+```{r cache=TRUE}
+# --- Question 1, part 6 ---
+dat.cr.both <- bind_rows(dat.cr.train, dat.cr.valid)
+
+m1.both <- glm(cr ~ 1, data = dat.cr.both, family = "binomial")
+scope.wo.both <- as.formula(paste("~", paste(nam.without, collapse = " + ")))
+
+m.forward.both <- step(
+  m1.both,
+  scope  = list(lower = ~1, upper = scope.wo.both),
+  direction = "forward",
+  trace  = 0
+)
+
+summary(m.forward.both)
+
+setdiff(names(m.forward.without$coefficients),
+        names(m.forward.both$coefficients))
+
+setdiff(names(m.forward.both$coefficients),
+        names(m.forward.without$coefficients))
+
+```
+
+
+
+
+# Question 2
+
+In logistic regression, if a categorical predictor has a category such that all of the values of the outcome variable are the same for that category, this is an example of *quasicomplete separation*.
+
+## Question 2, part 1
+
+(5 points)
+
+Note that for the model below, the category "x" is not a statistically significant predictor of "y", despite the fact that for all observations with "x" equal to "a", the value of "y" is $1$, while only 30 out of 50 of the values of "y" are $1$ for "x" equal to "b".
+
+Please plot the predicted probabilities of "y" and the observed values of "y" for the model below using the x-axis to represent the value of "ind" and the y-axis to represent both the y-value and the fitted probability of the outcome at the corresponding index. You may use geom_point for this. Coloring the observed values by the x-label will help you see the relationship. Do the fitted probabilities appear to correspond well to the probabilities in each category in the data?
+
+### your answer here
+
+```{r}
+# --- Question 2, part 1 ---
+ind <- 1:100
+x   <- rep(c("a", "b"), each = 50)
+y   <- c(rep(1, 50), rep(1, 30), rep(0, 20))
+
+m.q <- glm(y ~ x, family = "binomial")
+
+dat.q <- data.frame(
+  ind    = ind,
+  x      = x,
+  y      = y,
+  y.prob = predict(m.q, type = "response")
+)
+
+ggplot(dat.q, aes(ind)) +
+  geom_point(aes(y = y, color = x), size = 2) +
+  geom_point(aes(y = y.prob), shape = 4, size = 2) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal()
+
+summary(m.q)
+tapply(dat.q$y.prob, dat.q$x, unique)
+
+```
+
+
+
+## Question 2, part 2
+
+(5 points)
+
+Please repeat the plotting for the data below, in which one of the observations in category "a" has been changed to $0$. Is the category "x" is a statistically significant predictor of "y"? Does quasicomplete separation present a challenge to interpretation of significance of predictors?
+
+### your answer here
+
+```{r}
+# --- Question 2, part 2 ---
+x <- rep(c("a", "b"), each = 50)
+y <- c(rep(1, 49), 0, rep(1, 30), rep(0, 20))
+
+m.ok <- glm(y ~ x, family = "binomial")
+
+dat.q <- data.frame(
+  ind    = ind,
+  x      = x,
+  y      = y,
+  y.prob = predict(m.ok, type = "response")
+)
+
+ggplot(dat.q, aes(ind)) +
+  geom_point(aes(y = y, color = x), size = 2) +
+  geom_point(aes(y = y.prob), shape = 4, size = 2) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal()
+
+summary(m.ok)
+dat.q$y.prob <- predict(m.ok, type = "response")
+
+tapply(dat.q$y.prob, dat.q$x, mean)
+
+```
+
+
+(Basically, the maximum likelihood for the data in group "a" in the first example occurs when the probability that y=1 is set to 1, corresponding to a positive infinite value for coefficient. Thus the error on any finite value has a large estimate.) 
+
